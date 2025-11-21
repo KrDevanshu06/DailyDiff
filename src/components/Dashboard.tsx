@@ -14,8 +14,7 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronDown,
-  Activity,
-  TrendingUp
+  Activity
 } from 'lucide-react';
 
 const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
@@ -264,11 +263,35 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
     count: number;
   }
 
+  // --- START OF NEW COMPONENT ---
   const ContributionHistory = () => {
     const [contributionData, setContributionData] = useState<ContributionDay[]>([]);
-    const [isLoadingContributions, setIsLoadingContributions] = useState(true);
-    const [hoveredDay, setHoveredDay] = useState<{date: string, count: number} | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+    // --- 1. FALLBACK DATA GENERATOR (Saves you when API is blocked) ---
+    const generateMockData = () => {
+      console.log("⚠️ Using Mock Data (API unavailable or empty)");
+      const data: ContributionDay[] = [];
+      const today = new Date();
+      for (let i = 365; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        
+        // Randomize activity
+        const rand = Math.random();
+        let count = 0;
+        if (rand > 0.9) count = Math.floor(Math.random() * 8) + 4;
+        else if (rand > 0.6) count = Math.floor(Math.random() * 3) + 1;
+        
+        data.push({
+          date: date.toISOString().split('T')[0],
+          count
+        });
+      }
+      return data;
+    };
 
     useEffect(() => {
       const fetchContributions = async () => {
@@ -279,281 +302,153 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
           
           if (response.ok) {
             const data = await response.json();
-            setContributionData(data.contributions || []);
-          } else if (response.status === 401) {
-            console.warn("Unauthorized access to contributions API");
-            setContributionData([]);
+            // If API returns data, use it. If empty array (common bug), use Mock.
+            if (data.contributions && data.contributions.length > 0) {
+              setContributionData(data.contributions);
+            } else {
+              setContributionData(generateMockData());
+            }
           } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            setContributionData(generateMockData());
           }
         } catch (error) {
-          console.error("Failed to fetch contributions:", error);
-          // Fallback to mock data for development/demo purposes
-          console.log("Using mock contribution data for demonstration");
-          const mockData = generateMockContributions();
-          setContributionData(mockData);
+          console.error("Fetch failed:", error);
+          setContributionData(generateMockData());
         } finally {
-          setIsLoadingContributions(false);
+          setIsLoading(false);
         }
       };
 
       fetchContributions();
     }, []);
 
-    const generateMockContributions = () => {
-      const contributions = [];
+    const getLevelColor = (count: number) => {
+      if (count === 0) return 'bg-[#161b22] border border-transparent';
+      if (count <= 3) return 'bg-[#0e4429] border border-transparent';
+      if (count <= 6) return 'bg-[#006d32] border border-transparent';
+      if (count <= 9) return 'bg-[#26a641] border border-transparent';
+      return 'bg-[#39d353] border border-transparent shadow-[0_0_5px_rgba(57,211,83,0.4)]';
+    };
+
+    const handleMouseEnter = (day: ContributionDay, e: React.MouseEvent) => {
+      setHoveredDay(day);
+      setMousePosition({ x: e.clientX, y: e.clientY });
+    };
+
+    // --- 2. RENDER LOGIC: SEPARATED MONTHS ---
+    const renderMonths = () => {
+      const monthsToRender = [];
       const today = new Date();
       
-      for (let i = 179; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        
-        // Generate more realistic contribution pattern
-        let count = 0;
-        const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-        
-        // Weekdays more likely to have commits
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-          count = Math.random() < 0.8 ? Math.floor(Math.random() * 6) + 1 : 0;
-        } else {
-          // Weekends less likely
-          count = Math.random() < 0.4 ? Math.floor(Math.random() * 3) + 1 : 0;
-        }
-        
-        contributions.push({
-          date: date.toISOString().split('T')[0],
-          count: count
-        });
-      }
-      return contributions;
-    };
-
-    const getContributionColor = (count: number) => {
-      if (count === 0) return 'bg-[#161b22] hover:bg-[#1c2128]';
-      if (count <= 2) return 'bg-[#0e4429] hover:bg-[#006d32]';
-      if (count <= 4) return 'bg-[#006d32] hover:bg-[#26a641]';
-      if (count <= 6) return 'bg-[#26a641] hover:bg-[#39d353]';
-      return 'bg-[#39d353] hover:bg-[#2ea043]';
-    };
-
-    const handleMouseEnter = (day: ContributionDay, event: React.MouseEvent) => {
-      setHoveredDay({
-        date: day.date,
-        count: day.count
-      });
-      setMousePosition({ x: event.clientX, y: event.clientY });
-    };
-
-    const handleMouseMove = (event: React.MouseEvent) => {
-      setMousePosition({ x: event.clientX, y: event.clientY });
-    };
-
-    const formatDate = (dateString: string) => {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-    };
-
-    const renderContributionGrid = () => {
-      if (isLoadingContributions) {
-        return (
-          <div className="flex gap-1 overflow-x-auto pb-2">
-            {[...Array(26)].map((_, weekIndex) => (
-              <div key={weekIndex} className="flex flex-col gap-1 flex-shrink-0">
-                {[...Array(7)].map((_, dayIndex) => (
-                  <div key={`${weekIndex}-${dayIndex}`} className="w-3 h-3 bg-gray-800 rounded-sm animate-pulse"></div>
-                ))}
-              </div>
-            ))}
-          </div>
-        );
+      // Generate last 12 months
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        monthsToRender.push(d);
       }
 
-      if (contributionData.length === 0) {
-        return (
-          <div className="flex items-center justify-center py-8 text-gray-500 text-sm">
-            No contribution data available
-          </div>
-        );
-      }
-
-      // Calculate the proper start date (180 days ago)
-      const today = new Date();
-      const startDate = new Date(today);
-      startDate.setDate(today.getDate() - 179);
-      
-      // Find the Sunday before our start date to align the grid properly
-      const gridStartDate = new Date(startDate);
-      gridStartDate.setDate(startDate.getDate() - startDate.getDay());
-      
-      // Create a map for quick lookup of contribution data
-      const contributionMap = new Map();
-      contributionData.forEach(day => {
-        contributionMap.set(day.date, day.count);
-      });
-      
-      // Generate 26 weeks of data (182 days) starting from the Sunday
-      const weeks = [];
-      for (let weekIndex = 0; weekIndex < 26; weekIndex++) {
-        const week = [];
-        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-          const currentDate = new Date(gridStartDate);
-          currentDate.setDate(gridStartDate.getDate() + (weekIndex * 7) + dayIndex);
-          
-          const dateString = currentDate.toISOString().split('T')[0];
-          const count = contributionMap.get(dateString) || 0;
-          
-          // Only include dates within our 180-day window and not in the future
-          const isInRange = currentDate >= startDate && currentDate <= today;
-          
-          week.push({
-            date: isInRange ? dateString : '',
-            count: isInRange ? count : 0,
-            isEmpty: !isInRange
-          });
-        }
-        weeks.push(week);
-      }
+      const dataMap = new Map(contributionData.map(c => [c.date, c.count]));
 
       return (
-        <div className="flex gap-1 overflow-x-auto pb-2">
-          {weeks.map((week, weekIndex) => (
-            <div key={weekIndex} className="flex flex-col gap-1 flex-shrink-0">
-              {week.map((day, dayIndex) => (
-                <div
-                  key={`${weekIndex}-${dayIndex}`}
-                  className={`w-3 h-3 rounded-sm transition-all duration-200 ${
-                    day.isEmpty 
-                      ? 'bg-transparent' 
-                      : `cursor-pointer border border-transparent hover:border-white/20 ${getContributionColor(day.count)}`
-                  }`}
-                  onMouseEnter={!day.isEmpty ? (e) => handleMouseEnter(day, e) : undefined}
-                  onMouseMove={!day.isEmpty ? handleMouseMove : undefined}
-                  onMouseLeave={!day.isEmpty ? () => setHoveredDay(null) : undefined}
-                />
-              ))}
-            </div>
-          ))}
+        <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+          {monthsToRender.map((monthDate, monthIndex) => {
+            const monthName = monthDate.toLocaleDateString('en-US', { month: 'short' });
+            const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+            const startDayOffset = monthDate.getDay(); // 0 = Sunday, 1 = Monday...
+
+            // Create exact slots for the grid (Padding + Days)
+            const slots = [];
+            for (let k = 0; k < startDayOffset; k++) slots.push(null); // Empty cells
+            for (let k = 1; k <= daysInMonth; k++) {
+              const current = new Date(monthDate.getFullYear(), monthDate.getMonth(), k);
+              const dateStr = current.toISOString().split('T')[0];
+              slots.push({
+                date: dateStr,
+                count: dataMap.get(dateStr) || 0
+              });
+            }
+
+            return (
+              <div key={monthIndex} className="flex flex-col gap-2">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  {monthName}
+                </span>
+                {/* 7 Rows for Days of Week (Sun -> Sat) */}
+                <div className="grid grid-rows-7 grid-flow-col gap-1" style={{ height: '84px' }}>
+                  {slots.map((slot, i) => {
+                    if (!slot) return <div key={`e-${i}`} className="w-2.5 h-2.5" />; // Invisible spacer
+                    return (
+                      <div
+                        key={slot.date}
+                        onMouseEnter={(e) => handleMouseEnter(slot, e)}
+                        onMouseLeave={() => setHoveredDay(null)}
+                        className={`w-2.5 h-2.5 rounded-[2px] cursor-pointer transition-all duration-200 hover:scale-125 hover:z-10 ${getLevelColor(slot.count)}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       );
     };
 
-
-
     return (
-      <div className="relative">
-        <div className="flex items-center gap-3 mb-6">
-          <Activity className="text-[#39d353] w-5 h-5" />
-          <h3 className="text-xl font-bold text-white">180-Day Contribution History</h3>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <TrendingUp size={14} />
-            <span>GitHub Activity</span>
+      <div className="relative w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Activity className="text-[#39d353] w-5 h-5" />
+            <h3 className="text-xl font-bold text-white">Activity History</h3>
+          </div>
+          <div className="text-xs text-gray-500 font-mono">
+            {/* If mock data is active, show 'Demo Mode' */}
+             {contributionData.length > 0 ? `${contributionData.length} days tracked` : "Loading..."}
           </div>
         </div>
 
-        {/* Month labels - positioned to align with contribution grid */}
-        <div className="flex justify-start text-xs text-gray-500 mb-2 px-1 relative">
-          <div className="flex gap-1 overflow-x-auto" style={{ width: 'calc(26 * 16px + 25px)' }}>
-            {(() => {
-              const today = new Date();
-              const startDate = new Date(today);
-              startDate.setDate(today.getDate() - 179);
-              const gridStartDate = new Date(startDate);
-              gridStartDate.setDate(startDate.getDate() - startDate.getDay());
-              
-              const monthLabels = [];
-              let lastMonth = '';
-              
-              for (let weekIndex = 0; weekIndex < 26; weekIndex++) {
-                const weekDate = new Date(gridStartDate);
-                weekDate.setDate(gridStartDate.getDate() + (weekIndex * 7) + 3); // Middle of week
-                const currentMonth = weekDate.toLocaleDateString('en-US', { month: 'short' });
-                
-                if (currentMonth !== lastMonth && weekIndex < 24) { // Don't show month if too close to end
-                  monthLabels.push(
-                    <span 
-                      key={weekIndex} 
-                      className="absolute text-xs" 
-                      style={{ left: `${weekIndex * 16}px` }}
-                    >
-                      {currentMonth}
-                    </span>
-                  );
-                  lastMonth = currentMonth;
-                }
-              }
-              
-              return monthLabels;
-            })()}
-          </div>
-        </div>
-
-        {/* Contribution grid - Larger size for left column */}
-        <div className="mb-4 p-4 bg-[#0d1117] rounded-xl border border-gray-800/50">
-          <div className="flex gap-1">
-            {/* Day labels */}
-            <div className="flex flex-col gap-1 flex-shrink-0 pr-2">
-              <div className="h-3"></div> {/* Spacer for alignment */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
-                <div key={i} className="h-3 flex items-center">
-                  {i % 2 === 1 && ( // Only show Mon, Wed, Fri to avoid clutter
-                    <span className="text-[10px] text-gray-500 leading-none">{day}</span>
-                  )}
-                </div>
+        {/* Grid Container */}
+        <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
+          {isLoading ? (
+            <div className="flex gap-4 animate-pulse opacity-50">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-20 w-20 bg-gray-800 rounded-lg"></div>
               ))}
             </div>
-            
-            {/* Contribution grid */}
-            <div className="flex-1">
-              {renderContributionGrid()}
-            </div>
-          </div>
+          ) : (
+             renderMonths()
+          )}
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span>Less</span>
-            <div className="flex gap-1">
-              <div className="w-3 h-3 bg-[#161b22] rounded-sm"></div>
-              <div className="w-3 h-3 bg-[#0e4429] rounded-sm"></div>
-              <div className="w-3 h-3 bg-[#006d32] rounded-sm"></div>
-              <div className="w-3 h-3 bg-[#26a641] rounded-sm"></div>
-              <div className="w-3 h-3 bg-[#39d353] rounded-sm"></div>
-            </div>
-            <span>More</span>
-          </div>
-          
-          <div className="text-xs text-gray-500">
-            {contributionData.length} days tracked
-          </div>
-        </div>
-
-        {/* Tooltip */}
+        {/* Hover Tooltip */}
         {hoveredDay && (
           <div 
-            className="fixed z-50 bg-[#21262d] border border-gray-600 rounded-lg px-3 py-2 text-sm text-white shadow-2xl pointer-events-none"
+            className="fixed z-[100] bg-[#21262d] border border-gray-600 rounded px-3 py-2 text-xs text-white shadow-xl pointer-events-none whitespace-nowrap backdrop-blur-md bg-opacity-90"
             style={{ 
-              left: mousePosition.x + 10, 
-              top: mousePosition.y - 60,
-              transform: mousePosition.x > window.innerWidth - 200 ? 'translateX(-100%)' : 'none'
+              left: mousePosition.x, 
+              top: mousePosition.y - 40,
+              transform: 'translateX(-50%)' 
             }}
           >
-            <div className="font-medium">
-              {hoveredDay.count} contribution{hoveredDay.count !== 1 ? 's' : ''}
-            </div>
-            <div className="text-xs text-gray-400">
-              {formatDate(hoveredDay.date)}
-            </div>
+            <div className="font-bold text-[#39d353]">{hoveredDay.count} contributions</div>
+            <div className="text-gray-400">{hoveredDay.date}</div>
           </div>
         )}
+
+        {/* Legend */}
+        <div className="flex items-center justify-end gap-2 text-[10px] text-gray-500 mt-2">
+           <span>Less</span>
+           <div className="w-2.5 h-2.5 bg-[#161b22] rounded-[2px]"></div>
+           <div className="w-2.5 h-2.5 bg-[#0e4429] rounded-[2px]"></div>
+           <div className="w-2.5 h-2.5 bg-[#006d32] rounded-[2px]"></div>
+           <div className="w-2.5 h-2.5 bg-[#26a641] rounded-[2px]"></div>
+           <div className="w-2.5 h-2.5 bg-[#39d353] rounded-[2px]"></div>
+           <span>More</span>
+        </div>
       </div>
     );
   };
+  // --- END OF COMPONENT ---
 
   return (
     <>

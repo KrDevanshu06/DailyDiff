@@ -1,11 +1,24 @@
 import { Octokit } from "@octokit/rest";
 
+// Simple cache for streak data
+const streakCache = new Map();
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
 export async function getRealtimeStreak(accessToken) {
+  const cacheKey = `streak_${accessToken.slice(-8)}`; // Use last 8 chars as key
+  const cached = streakCache.get(cacheKey);
+  
+  // Return cached data if available and not expired
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    console.log('Returning cached streak data');
+    return cached.data;
+  }
+
   const octokit = new Octokit({ 
     auth: accessToken,
     request: {
       timeout: 15000, // 15 second timeout
-      retries: 2,     // Retry up to 2 times on failure
+      retries: 1,     // Reduced retries to avoid rate limits
     }
   });
 
@@ -65,10 +78,26 @@ export async function getRealtimeStreak(accessToken) {
       }
     }
 
-    return { streak, lastContributionDate: days.find(d => d.contributionCount > 0)?.date };
+    const result = { streak, lastContributionDate: days.find(d => d.contributionCount > 0)?.date };
+    
+    // Cache the result
+    streakCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+    
+    console.log(`Calculated and cached streak: ${streak}`);
+    return result;
 
   } catch (error) {
     console.error("Failed to calc streak:", error);
+    
+    // Handle rate limiting gracefully
+    if (error.message && error.message.includes('rate limit')) {
+      console.log("Rate limit hit for streak calculation, returning cached or default");
+      return cached ? cached.data : { streak: 0, rateLimited: true };
+    }
+    
     return { streak: 0, error: true };
   }
 }

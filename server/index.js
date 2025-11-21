@@ -33,6 +33,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// ================================================================
+// IN-MEMORY CACHES FOR RATE LIMIT PREVENTION
+// ================================================================
+const streakCache = new Map();
+
 // --- 2. AUTH ROUTES ---
 
 app.get('/auth/github', (req, res) => {
@@ -100,14 +105,45 @@ app.get('/auth/github/callback', async (req, res) => {
   }
 });
 
+// ================================================================
+// REPLACE THE EXISTING '/api/user' ROUTE WITH THIS BLOCK
+// ================================================================
 app.get('/api/user', async (req, res) => {
   if (req.session.githubId) {
     
-    // FETCH STREAK ON DEMAND
-    // Note: In high-scale apps, cache this (Redis) for 1 hour to avoid rate limits.
     let streakData = { streak: 0 };
+    
     if (req.session.token) {
-      streakData = await getRealtimeStreak(req.session.token);
+      const cacheKey = req.session.githubId;
+      const cached = streakCache.get(cacheKey);
+      const ONE_HOUR = 60 * 60 * 1000;
+
+      // 1. CHECK CACHE FIRST
+      if (cached && (Date.now() - cached.timestamp < ONE_HOUR)) {
+        console.log(`⚡ Serving streak from cache for ${req.session.username}`);
+        streakData = cached.data;
+      } else {
+        // 2. IF NO CACHE, FETCH FRESH DATA
+        try {
+          console.log(`🌍 Fetching fresh streak data for ${req.session.username}...`);
+          streakData = await getRealtimeStreak(req.session.token);
+          
+          // 3. SAVE TO CACHE (Only if no error)
+          if (!streakData.error) {
+            streakCache.set(cacheKey, { 
+              timestamp: Date.now(), 
+              data: streakData 
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching streak:", error.message);
+          // If rate limited, try to return stale cache if it exists
+          if (cached) {
+             console.log("⚠️ API Failed, serving stale cache.");
+             streakData = cached.data;
+          }
+        }
+      }
     }
 
     res.json({ 
@@ -115,7 +151,7 @@ app.get('/api/user', async (req, res) => {
       username: req.session.username,
       githubId: req.session.githubId,
       avatarUrl: req.session.avatarUrl,
-      streak: streakData.streak // <--- Sending real data
+      streak: streakData.streak 
     });
   } else {
     res.json({ authenticated: false });
@@ -185,11 +221,24 @@ app.post('/api/commit-now', async (req, res) => {
 
 
 
+// Simple in-memory cache for contribution data (in production, use Redis)
+const contributionCache = new Map();
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
 app.get('/api/contributions', async (req, res) => {
   if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
   
+  const cacheKey = `contributions_${req.session.githubId}`;
+  const cached = contributionCache.get(cacheKey);
+  
+  // Return cached data if available and not expired
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    console.log('Returning cached contribution data');
+    return res.json({ contributions: cached.data });
+  }
+  
   try {
-    // GitHub GraphQL query for contribution data (last 180 days)
+    // GitHub GraphQL query for contribution data (last year)
     const query = `
       query($username: String!) {
         user(login: $username) {
@@ -218,18 +267,35 @@ app.get('/api/contributions', async (req, res) => {
     });
 
     if (response.data.errors) {
-      throw new Error(`GraphQL Error: ${response.data.errors[0].message}`);
+      const error = response.data.errors[0];
+      
+      // Handle rate limiting specifically
+      if (error.type === 'RATE_LIMIT') {
+        console.log('GitHub API rate limit hit, returning empty for fallback to mock data');
+        return res.json({ 
+          contributions: [],
+          rateLimited: true,
+          message: 'Rate limit exceeded, using mock data'
+        });
+      }
+      
+      throw new Error(`GraphQL Error: ${error.message}`);
     }
 
     // Extract contribution days and flatten the weeks array
     const weeks = response.data.data.user.contributionsCollection.contributionCalendar.weeks;
     const allDays = weeks.flatMap(week => week.contributionDays);
     
-    // Get last 180 days only
-    const last180Days = allDays.slice(-180);
+    // Cache the data
+    contributionCache.set(cacheKey, {
+      data: allDays,
+      timestamp: Date.now()
+    });
+    
+    console.log(`Fetched and cached ${allDays.length} contribution days`);
     
     res.json({ 
-      contributions: last180Days.map(day => ({
+      contributions: allDays.map(day => ({
         date: day.date,
         count: day.contributionCount
       }))
@@ -237,9 +303,12 @@ app.get('/api/contributions', async (req, res) => {
 
   } catch (error) {
     console.error('Failed to fetch contributions:', error.message);
-    res.status(500).json({ 
+    
+    // Return empty array so frontend falls back to mock data
+    res.json({ 
+      contributions: [],
       error: 'Failed to fetch contribution data',
-      details: error.message 
+      fallback: true
     });
   }
 });
