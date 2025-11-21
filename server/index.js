@@ -6,7 +6,9 @@ import cookieSession from 'cookie-session';
 import { createClient } from '@supabase/supabase-js';
 import cron from 'node-cron';
 import { pushDailyUpdate } from './commitBot.js';
-import { getRealtimeStreak } from './streakService.js'; 
+import { getRealtimeStreak } from './streakService.js';
+import { promises as fs } from 'fs';
+import path from 'path'; 
 
 dotenv.config();
 
@@ -204,7 +206,18 @@ app.post('/api/commit-now', async (req, res) => {
   
   const { repoName, message } = req.body;
   
-  const result = await pushDailyUpdate(req.session.token, repoName, message);
+  // Validate input
+  if (!repoName || !repoName.trim()) {
+    return res.status(400).json({ error: "Repository name is required" });
+  }
+  
+  if (!repoName.includes('/') || repoName.split('/').length !== 2) {
+    return res.status(400).json({ error: "Repository name must be in format: username/repository-name" });
+  }
+
+  console.log(`🚀 Manual commit requested for ${repoName} by ${req.session.username}`);
+  
+  const result = await pushDailyUpdate(req.session.token, repoName.trim(), message);
   
   if (result.success) {
     // Update timestamp even for manual commits
@@ -221,24 +234,56 @@ app.post('/api/commit-now', async (req, res) => {
 
 
 
-// Simple in-memory cache for contribution data (in production, use Redis)
-const contributionCache = new Map();
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+// --- PERSISTENT DISK CACHE FOR CONTRIBUTION DATA ---
+const CACHE_FILE = path.join(process.cwd(), 'cache_contributions.json');
+const CACHE_DURATION = 60 * 60 * 1000; // 1 Hour
+
+// Helper: Read from Disk
+async function getDiskCache(key) {
+  try {
+    const raw = await fs.readFile(CACHE_FILE, 'utf-8');
+    const cache = JSON.parse(raw);
+    const entry = cache[key];
+    
+    if (entry && (Date.now() - entry.timestamp < CACHE_DURATION)) {
+      return entry.data;
+    }
+    return null; // Expired or doesn't exist
+  } catch (e) {
+    return null; // File doesn't exist yet
+  }
+}
+
+// Helper: Write to Disk
+async function setDiskCache(key, data) {
+  try {
+    let cache = {};
+    try {
+      const raw = await fs.readFile(CACHE_FILE, 'utf-8');
+      cache = JSON.parse(raw);
+    } catch (e) { /* File doesn't exist, create new object */ }
+
+    cache[key] = { timestamp: Date.now(), data };
+    await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
+  } catch (e) {
+    console.error("Cache write failed:", e);
+  }
+}
 
 app.get('/api/contributions', async (req, res) => {
   if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
   
   const cacheKey = `contributions_${req.session.githubId}`;
-  const cached = contributionCache.get(cacheKey);
   
-  // Return cached data if available and not expired
-  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log('Returning cached contribution data');
-    return res.json({ contributions: cached.data });
+  // 1. TRY DISK CACHE FIRST (Persists across restarts)
+  const cachedData = await getDiskCache(cacheKey);
+  if (cachedData) {
+    console.log('💾 Serving PERSISTED cached data');
+    return res.json({ contributions: cachedData });
   }
   
   try {
-    // GitHub GraphQL query for contribution data (last year)
+    console.log('🌍 Fetching fresh data from GitHub GraphQL...');
     const query = `
       query($username: String!) {
         user(login: $username) {
@@ -269,30 +314,36 @@ app.get('/api/contributions', async (req, res) => {
     if (response.data.errors) {
       const error = response.data.errors[0];
       
-      // Handle rate limiting specifically
+      // 2. CRITICAL FIX: If Rate Limited, try to find STALE cache on disk
       if (error.type === 'RATE_LIMIT') {
-        console.log('GitHub API rate limit hit, returning empty for fallback to mock data');
-        return res.json({ 
-          contributions: [],
-          rateLimited: true,
-          message: 'Rate limit exceeded, using mock data'
-        });
+        console.warn('⚠️ Rate Limit Hit! Attempting to serve stale cache...');
+        
+        // Force read raw file to get stale data ignoring timestamp
+        try {
+            const raw = await fs.readFile(CACHE_FILE, 'utf-8');
+            const cache = JSON.parse(raw);
+            if (cache[cacheKey]) {
+                console.log('✅ Served STALE data to survive rate limit.');
+                return res.json({ contributions: cache[cacheKey].data, rateLimited: true });
+            }
+        } catch(e) {}
+
+        // If no stale cache, return empty to trigger frontend mock data
+        return res.json({ contributions: [], rateLimited: true });
       }
-      
-      throw new Error(`GraphQL Error: ${error.message}`);
+      throw new Error(error.message);
     }
 
-    // Extract contribution days and flatten the weeks array
     const weeks = response.data.data.user.contributionsCollection.contributionCalendar.weeks;
     const allDays = weeks.flatMap(week => week.contributionDays);
     
-    // Cache the data
-    contributionCache.set(cacheKey, {
-      data: allDays,
-      timestamp: Date.now()
-    });
+    // 3. SAVE TO DISK
+    await setDiskCache(cacheKey, allDays.map(day => ({
+        date: day.date,
+        count: day.contributionCount
+    })));
     
-    console.log(`Fetched and cached ${allDays.length} contribution days`);
+    console.log(`✅ Cached ${allDays.length} days to disk.`);
     
     res.json({ 
       contributions: allDays.map(day => ({
@@ -302,20 +353,52 @@ app.get('/api/contributions', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Failed to fetch contributions:', error.message);
-    
-    // Return empty array so frontend falls back to mock data
-    res.json({ 
-      contributions: [],
-      error: 'Failed to fetch contribution data',
-      fallback: true
-    });
+    console.error('API Error:', error.message);
+    // Fallback: Try to serve stale cache on any network error
+    try {
+        const raw = await fs.readFile(CACHE_FILE, 'utf-8');
+        const cache = JSON.parse(raw);
+        if (cache[cacheKey]) {
+            return res.json({ contributions: cache[cacheKey].data, error: "Served stale due to error" });
+        }
+    } catch(e) {}
+
+    res.json({ contributions: [], error: error.message });
   }
 });
 
 app.post('/api/logout', (req, res) => {
   req.session = null;
   res.json({ status: "logged out" });
+});
+
+// Test endpoint for contribution data (no auth required)
+app.get('/api/test-contributions', (req, res) => {
+  console.log('🧪 Test contributions endpoint called');
+  
+  // Generate mock data similar to GitHub API response
+  const mockData = [];
+  const today = new Date();
+  
+  for (let i = 365; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    
+    const rand = Math.random();
+    let count = 0;
+    if (rand > 0.85) count = Math.floor(Math.random() * 10) + 5;
+    else if (rand > 0.5) count = Math.floor(Math.random() * 5) + 1;
+    
+    mockData.push({
+      date: date.toISOString().split('T')[0],
+      count
+    });
+  }
+  
+  res.json({ 
+    contributions: mockData,
+    mock: true
+  });
 });
 
 // --- 4. CRON JOB ---
