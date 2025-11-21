@@ -11,7 +11,13 @@ dist
 dist-ssr
 *.local
 
+# DailyDiff Local Cache
+cache_contributions.json
+server/cache_contributions.json
+
 .vscode/*
+uploads/
+modules/
 !.vscode/extensions.json
 .idea
 .DS_Store

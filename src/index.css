@@ -86,3 +86,34 @@ html, body {
   color: transparent;
   background-image: linear-gradient(to right, #ffffff, #a1a1aa);
 }
+
+/* Custom scrollbar for contribution history */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #161b22;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Custom grid utilities for contribution calendar */
+@layer utilities {
+  .grid-rows-7 {
+    grid-template-rows: repeat(7, minmax(0, 1fr));
+  }
+  
+  .grid-flow-col {
+    grid-auto-flow: column;
+  }
+}
+

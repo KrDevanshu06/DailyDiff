@@ -51,6 +51,18 @@ export async function pushDailyUpdate(userToken, repoName, contentMessage) {
     return { success: true, message: "Commit pushed" };
   } catch (error) {
     console.error("❌ Failed to push commit:", error);
-    return { success: false, error: error.message };
+    
+    // Provide more specific error messages
+    if (error.status === 404) {
+      return { success: false, error: "Repository not found. Check if the repository exists and you have access to it." };
+    }
+    if (error.status === 403) {
+      return { success: false, error: "Permission denied. Check if your GitHub token has write access to this repository." };
+    }
+    if (error.status === 401) {
+      return { success: false, error: "Authentication failed. Please re-login to GitHub." };
+    }
+    
+    return { success: false, error: error.message || "Unknown error occurred" };
   }
 }
