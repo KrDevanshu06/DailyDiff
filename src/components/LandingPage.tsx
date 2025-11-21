@@ -6,12 +6,11 @@ import {
   Clock, 
   Zap, 
   Activity,
-  ArrowRight, 
   Terminal,
   GitCommit
 } from 'lucide-react';
 
-const LandingPage = ({ onLogin }: { onLogin: () => void }) => {
+const LandingPage = () => {
   const [scrolled, setScrolled] = useState(false);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
@@ -71,13 +70,13 @@ const LandingPage = ({ onLogin }: { onLogin: () => void }) => {
 
           <div className="flex items-center gap-4">
             <button 
-              onClick={onLogin}
+              onClick={() => window.location.href = 'http://localhost:3000/auth/github'}
               className="text-sm font-medium text-gray-400 hover:text-white transition-colors hidden sm:block"
             >
               Sign In
             </button>
             <button 
-              onClick={onLogin}
+              onClick={() => window.location.href = 'http://localhost:3000/auth/github'}
               className="bg-[#238636] hover:bg-[#2ea043] text-white px-5 py-2.5 rounded-full text-sm font-bold transition-all hover:shadow-[0_0_20px_rgba(46,160,67,0.4)] flex items-center gap-2 border border-white/10"
             >
               <Github className="w-4 h-4" />
@@ -116,7 +115,7 @@ const LandingPage = ({ onLogin }: { onLogin: () => void }) => {
           {/* CTAs */}
           <div className="animate-fade-in-up delay-300 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
             <button 
-              onClick={onLogin}
+              onClick={() => window.location.href = 'http://localhost:3000/auth/github'}
               className="w-full sm:w-auto bg-white text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all flex items-center justify-center gap-2 hover:-translate-y-1"
             >
               <Github className="w-5 h-5" />

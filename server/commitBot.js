@@ -2,7 +2,13 @@ import { Octokit } from "@octokit/rest";
 
 export async function pushDailyUpdate(userToken, repoName, contentMessage) {
   // Initialize Octokit with the USER'S token, not your app's generic token
-  const octokit = new Octokit({ auth: userToken });
+  const octokit = new Octokit({ 
+    auth: userToken,
+    request: {
+      timeout: 15000, // 15 second timeout
+      retries: 2,     // Retry up to 2 times on failure
+    }
+  });
   
   const [owner, repo] = repoName.split('/'); // e.g., "krdevanshu06/daily-log"
   const path = 'README.md';
