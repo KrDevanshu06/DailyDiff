@@ -4,16 +4,16 @@
 Set these in your Railway deployment:
 
 ```bash
-GITHUB_CLIENT_ID=Ov23liSexHFuf9odCWMS
-GITHUB_CLIENT_SECRET=483dfa4b54a71af9f807ee8c9b78329a1c210d1b
-SUPABASE_URL=https://fqulrtifodrbtwsnkexp.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxdWxydGlmb2RyYnR3c25rZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MzMwNDUsImV4cCI6MjA3OTIwOTA0NX0.G8MwYqi8rXh1_oWVmjQ3qjj-dFOOOzn5L5UF4waUkZk
+GITHUB_CLIENT_ID= Github Client ID of Oauth
+GITHUB_CLIENT_SECRET=Github Client Secret of Oauth
+SUPABASE_URL= Supabase URL
+SUPABASE_SERVICE_KEY=Secret Key 
 SESSION_SECRET=super_secret_random_string_123_production
 NODE_ENV=production
 
 # Update these with your actual deployment URLs:
-SERVER_URL=https://dailydiff-production.up.railway.app
-CLIENT_URL=https://dailydiff.vercel.app
+SERVER_URL= server deployment url   
+CLIENT_URL= site deployment url
 ```
 
 ## Frontend (Vercel) Environment Variables
@@ -21,7 +21,7 @@ Set this in your Vercel deployment:
 
 ```bash
 # Update with your Railway URL:
-VITE_API_URL=https://dailydiff-production.up.railway.app
+VITE_API_URL= site deployment url
 ```
 
 ## Security Features:
