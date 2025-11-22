@@ -39,6 +39,21 @@ app.use(cors({
 
 app.use(express.json());
 
+// --- HEALTH CHECK ROUTE (For Cron Jobs) ---
+app.get('/', (req, res) => {
+  res.status(200).send('✅ DailyDiff Backend is Active');
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'active', 
+    timestamp: new Date(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
+});
+
 app.set('trust proxy', 1); // Critical for Railway/Heroku cookies
 
 app.use(cookieSession({
