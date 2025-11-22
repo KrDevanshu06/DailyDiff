@@ -53,17 +53,55 @@ const ContributionHistory = () => {
 
   useEffect(() => {
     const fetchContributions = async () => {
+      const CACHE_KEY = 'dailydiff_client_cache';
+      const CACHE_DURATION = 60 * 60 * 1000; // 1 Hour Cache
+      
+      // 2. CLIENT-SIDE CACHE CHECK
+      const cachedRaw = localStorage.getItem(CACHE_KEY);
+      if (cachedRaw) {
+        try {
+          const { timestamp, data } = JSON.parse(cachedRaw);
+          const age = Date.now() - timestamp;
+          
+          // If cache is valid (less than 1 hour old), use it
+          if (age < CACHE_DURATION) {
+            console.log(`⚡ Using client-side cache (${Math.round(age / 60000)} mins old)`);
+            setContributionData(data);
+            setIsLoading(false);
+            return; // EXIT EARLY - Do not hit the API
+          }
+        } catch (e) {
+          console.warn("Cache parsing failed, clearing:", e);
+          localStorage.removeItem(CACHE_KEY);
+        }
+      }
+
+      // 3. FETCH FROM SERVER (Only if cache missed or expired)
       try {
+        console.log("🌍 Cache expired or missing, fetching from server...");
         const response = await fetch(`${API_URL}/api/contributions`, { credentials: 'include' });
+        
         if (response.ok) {
           const data = await response.json();
           if (data.contributions && data.contributions.length > 0) {
             setContributionData(data.contributions);
+            
+            // 4. SAVE TO CLIENT STORAGE
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              data: data.contributions
+            }));
           } else {
             setContributionData(generateMockData());
           }
         } else {
-          setContributionData(generateMockData());
+          // If server error, fall back to cache even if expired (better than nothing)
+          if (cachedRaw) {
+             const { data } = JSON.parse(cachedRaw);
+             setContributionData(data);
+          } else {
+             setContributionData(generateMockData());
+          }
         }
       } catch (error) {
         console.error("Fetch failed:", error);
@@ -72,6 +110,7 @@ const ContributionHistory = () => {
         setIsLoading(false);
       }
     };
+    
     fetchContributions();
   }, []);
 
