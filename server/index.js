@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import cron from 'node-cron';
 import { pushDailyUpdate } from './commitBot.js';
 import { getRealtimeStreak } from './streakService.js';
+import { getAvailableStrategies } from './contentStrategies.js';
 import { promises as fs } from 'fs';
 import path from 'path'; 
 
@@ -200,11 +201,17 @@ app.post('/api/schedule', async (req, res) => {
   res.json({ status: "success", message: "Schedule active" });
 });
 
+// Get Available Content Strategies
+app.get('/api/content-strategies', (req, res) => {
+  const strategies = getAvailableStrategies();
+  res.json({ strategies });
+});
+
 // Manual Commit Route
 app.post('/api/commit-now', async (req, res) => {
   if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
   
-  const { repoName, message } = req.body;
+  const { repoName, message, contentStrategy } = req.body;
   
   // Validate input
   if (!repoName || !repoName.trim()) {
@@ -215,9 +222,31 @@ app.post('/api/commit-now', async (req, res) => {
     return res.status(400).json({ error: "Repository name must be in format: username/repository-name" });
   }
 
-  console.log(`🚀 Manual commit requested for ${repoName} by ${req.session.username}`);
+  console.log(`🚀 Manual commit requested for ${repoName} by ${req.session.username} using ${contentStrategy || 'default'} strategy`);
   
-  const result = await pushDailyUpdate(req.session.token, repoName.trim(), message);
+  // Get user's saved content strategy if not provided
+  let strategyToUse = contentStrategy;
+  if (!strategyToUse && req.session.githubId) {
+    try {
+      const { data: schedule } = await supabase
+        .from('schedules')
+        .select('content_mode')
+        .eq('user_github_id', req.session.githubId)
+        .single();
+      
+      strategyToUse = schedule?.content_mode || 'learning-log';
+    } catch (err) {
+      strategyToUse = 'learning-log'; // fallback
+    }
+  }
+  
+  const result = await pushDailyUpdate(
+    req.session.token, 
+    repoName.trim(), 
+    message, 
+    strategyToUse || 'learning-log',
+    req.session.username
+  );
   
   if (result.success) {
     // Update timestamp even for manual commits
@@ -226,7 +255,11 @@ app.post('/api/commit-now', async (req, res) => {
          .update({ last_run_at: new Date().toISOString() })
          .eq('user_github_id', req.session.githubId);
     }
-    res.json({ status: 'success' });
+    res.json({ 
+      status: 'success', 
+      content: result.content,
+      strategy: result.strategy 
+    });
   } else {
     res.status(500).json({ status: 'error', message: result.error });
   }
@@ -471,7 +504,9 @@ cron.schedule('* * * * *', async () => {
               pushDailyUpdate(
                 token, 
                 job.target_repo, 
-                `Auto-update: ${job.content_mode} entry`
+                "", // Empty message to use content strategy
+                job.content_mode || 'learning-log', // Use configured content strategy
+                job.users?.username // Pass username for personalized content
               ),
               new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Job timeout after 30 seconds')), 30000)

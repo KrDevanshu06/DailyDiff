@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import { Flame, GitBranch, CheckCircle2 } from 'lucide-react';
 
-type ViewState = 'landing' | 'dashboard';
-
 function App() {
-  const [view, setView] = useState<ViewState>('landing');
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authStep, setAuthStep] = useState('');
@@ -27,17 +28,29 @@ function App() {
           console.log("Session Check:", data);
           
           if (data.authenticated) {
-            setView('dashboard');
+            // Allow authenticated users to stay on landing page
+            // Only redirect to dashboard if they're trying to access it directly
+            // or coming from OAuth callback
+            if (location.pathname === '/auth/github/callback') {
+              navigate('/dashboard');
+            }
+            // Don't auto-redirect from '/' - let them choose to continue
           } else {
-            // Only reset to landing if we aren't already there
-            setView((prev) => prev === 'dashboard' ? 'landing' : 'landing');
+            // If NOT authenticated and trying to access dashboard, kick to home
+            if (location.pathname === '/dashboard') {
+              navigate('/');
+            }
           }
+        } else {
+          // API error implies not logged in
+          if (location.pathname === '/dashboard') navigate('/');
         }
       } catch (error) {
         console.error("Network error verifying session:", error);
-        setView('landing');
+        if (location.pathname === '/dashboard') navigate('/');
       } finally {
-        setIsLoading(false);
+        // Delay loading state slightly to prevent flash
+        setTimeout(() => setIsLoading(false), 500);
       }
     };
 
@@ -49,37 +62,34 @@ function App() {
       if (loginParam === 'success') {
         if (hasProcessedLogin.current) return; // Prevent double-fire
         hasProcessedLogin.current = true;
-
+        
         console.log("🎉 OAuth redirect detected. Starting professional auth flow...");
         
         // Start professional authentication sequence
         setIsAuthenticating(true);
         setIsLoading(true);
         
-        // Step 1: Verifying credentials
         setAuthStep('Verifying credentials...');
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        // Step 2: Setting up workspace
         setAuthStep('Setting up workspace...');
         await new Promise(resolve => setTimeout(resolve, 600));
         
-        // Step 3: Syncing with GitHub
         setAuthStep('Syncing with GitHub...');
-        await verifySession();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await verifySession(); // This will handle the redirect to dashboard if successful
         
-        // Step 4: Finalizing setup
+        // If verifySession didn't redirect (e.g. awaiting finalization), we continue
         setAuthStep('Finalizing setup...');
         await new Promise(resolve => setTimeout(resolve, 400));
 
         // 2. Clean URL so a refresh doesn't re-trigger this
-        window.history.replaceState({}, '', '/');
+        // We replace with /dashboard directly to ensure we are on the right route
+        window.history.replaceState({}, '', '/dashboard');
         
-        // 3. Complete authentication and show dashboard
-        setView('dashboard');
+        // 3. Complete authentication and move to dashboard
         setIsAuthenticating(false);
         setIsLoading(false);
+        navigate('/dashboard');
         return;
       }
 
@@ -88,18 +98,18 @@ function App() {
     };
 
     initAuth();
-  }, []);
+  }, [navigate, location.pathname]);
 
   const handleLogout = async () => {
     try {
       await fetch('http://localhost:3000/api/logout', { 
         method: 'POST',
-        credentials: 'include' // This ensures cookies are sent to be cleared
+        credentials: 'include' 
       });
-      setView('landing');
+      navigate('/');
     } catch (error) {
       console.error("Logout failed", error);
-      setView('landing'); // Still redirect to landing even if logout request fails
+      navigate('/');
     }
   };
 
@@ -183,7 +193,7 @@ function App() {
             ) : (
               <div className="text-center mb-6">
                 <p className="text-lg font-medium text-white mb-2">Loading DailyDiff</p>
-                <p className="text-sm text-gray-400 animate-pulse">Preparing your workspace...</p>
+                <p className="text-sm text-gray-400 animate-pulse">Checking your session...</p>
               </div>
             )}
 
@@ -232,23 +242,16 @@ function App() {
       <style>
         {`
           @keyframes appFadeIn {
-            0% {
-              opacity: 0;
-              transform: translateY(20px);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0);
-            }
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
           }
         `}
       </style>
       <div style={{ animation: 'appFadeIn 0.5s ease-out' }}>
-        {view === 'landing' ? (
-          <LandingPage />
-        ) : (
-          <Dashboard onLogout={handleLogout} />
-        )}
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/dashboard" element={<Dashboard onLogout={handleLogout} />} />
+        </Routes>
       </div>
     </>
   );

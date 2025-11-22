@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Flame, 
   Github, 
@@ -13,19 +14,53 @@ import {
   Users,
   Sparkles,
   ArrowRight,
-  ChevronDown
+  ChevronDown,
+  Menu,
+  X
 } from 'lucide-react';
 
 const LandingPage = () => {
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState('hero');
-  const [showCookieConsent, setShowCookieConsent] = useState(true);
+  const [showCookieConsent, setShowCookieConsent] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Check cookie consent and authentication status
+  useEffect(() => {
+    // Check if user has already accepted cookies
+    const cookieConsent = localStorage.getItem('cookieConsent');
+    if (cookieConsent === 'accepted') {
+      setShowCookieConsent(false);
+    } else {
+      setShowCookieConsent(true);
+    }
+
+    // Check if user is authenticated
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/user', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setIsAuthenticated(data.authenticated || false);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   // Intersection Observer for active section tracking
@@ -101,9 +136,15 @@ const LandingPage = () => {
 
 
 
-  // Handle referral tracking
+  // Handle referral tracking and authentication
   const handleSignUp = (source: string) => {
-    // Add UTM parameters for tracking
+    // If user is already authenticated, navigate to dashboard
+    if (isAuthenticated) {
+      navigate('/dashboard');
+      return;
+    }
+
+    // Otherwise, proceed with OAuth
     const params = new URLSearchParams({
       utm_source: 'landing_page',
       utm_medium: 'web',
@@ -112,6 +153,12 @@ const LandingPage = () => {
     });
     
     window.location.href = `http://localhost:3000/auth/github?${params.toString()}`;
+  };
+
+  // Handle cookie consent acceptance
+  const handleAcceptCookies = () => {
+    localStorage.setItem('cookieConsent', 'accepted');
+    setShowCookieConsent(false);
   };
 
   const renderHeroGrid = () => {
@@ -156,18 +203,19 @@ const LandingPage = () => {
 
       {/* Navigation */}
       <nav className={`fixed w-full top-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#0d1117]/80 backdrop-blur-lg border-b border-gray-800' : 'bg-transparent border-transparent border-b'}`}>
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
           <div className="flex items-center gap-2 group cursor-pointer">
-            <div className="p-2 bg-gradient-to-br from-[#2ea043] to-[#238636] rounded-lg group-hover:scale-105 transition-transform">
-              <Flame className="w-5 h-5 text-white fill-white" />
+            <div className="p-1.5 sm:p-2 bg-gradient-to-br from-[#2ea043] to-[#238636] rounded-lg group-hover:scale-105 transition-transform">
+              <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-white fill-white" />
             </div>
-            <span className="font-bold text-lg tracking-tight">Daily<span className="text-[#39d353]">Diff</span></span>
+            <span className="font-bold text-base sm:text-lg tracking-tight">Daily<span className="text-[#39d353]">Diff</span></span>
           </div>
 
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-6 lg:gap-8 text-sm font-medium text-gray-400">
             <button 
               onClick={() => scrollToSection('how-it-works')}
-              className={`hover:text-white transition-colors duration-300 px-3 py-2 ${
+              className={`hover:text-white transition-colors duration-300 px-2 lg:px-3 py-2 ${
                 activeSection === 'how-it-works' ? 'text-[#39d353] font-semibold' : ''
               }`}
             >
@@ -175,7 +223,7 @@ const LandingPage = () => {
             </button>
             <button 
               onClick={() => scrollToSection('demo')}
-              className={`hover:text-white transition-colors duration-300 px-3 py-2 ${
+              className={`hover:text-white transition-colors duration-300 px-2 lg:px-3 py-2 ${
                 activeSection === 'demo' ? 'text-[#39d353] font-semibold' : ''
               }`}
             >
@@ -183,7 +231,7 @@ const LandingPage = () => {
             </button>
             <button 
               onClick={() => scrollToSection('features')}
-              className={`hover:text-white transition-colors duration-300 px-3 py-2 ${
+              className={`hover:text-white transition-colors duration-300 px-2 lg:px-3 py-2 ${
                 activeSection === 'features' ? 'text-[#39d353] font-semibold' : ''
               }`}
             >
@@ -191,47 +239,101 @@ const LandingPage = () => {
             </button>
           </div>
 
-          <div className="flex items-center">
+          {/* Mobile and Desktop CTA */}
+          <div className="flex items-center gap-3">
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+
+            {/* CTA Button */}
             <button 
               onClick={() => handleSignUp('navbar_cta')}
-              className="group bg-[#238636] hover:bg-[#2ea043] text-white px-6 py-3 rounded-full text-sm font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(46,160,67,0.5)] flex items-center gap-2 border border-white/10 hover:scale-105 transform hover:-translate-y-0.5 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#2ea043] focus:ring-offset-2 focus:ring-offset-[#0d1117]"
-              aria-label="Start your free GitHub streak tracking"
+              className="group bg-[#238636] hover:bg-[#2ea043] text-white px-3 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-sm font-bold transition-all duration-300 hover:shadow-[0_0_25px_rgba(46,160,67,0.5)] flex items-center gap-1.5 sm:gap-2 border border-white/10 hover:scale-105 transform hover:-translate-y-0.5 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#2ea043] focus:ring-offset-2 focus:ring-offset-[#0d1117]"
+              aria-label={isAuthenticated ? "Go to your dashboard" : "Start your free GitHub streak tracking"}
             >
-              <Github className="w-4 h-4 transition-transform duration-300 group-hover:rotate-12" />
-              Start Free
+              <Github className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:rotate-12" />
+              <span className="hidden sm:inline">{isAuthenticated ? 'Dashboard' : 'Start Free'}</span>
+              <span className="sm:hidden">{isAuthenticated ? 'Go' : 'Start'}</span>
             </button>
           </div>
+
+          {/* Mobile Menu Overlay */}
+          {isMobileMenuOpen && (
+            <>
+              <div 
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+                onClick={() => setIsMobileMenuOpen(false)}
+              />
+              <div className="fixed top-16 left-4 right-4 bg-[#161b22] border border-gray-700 rounded-xl p-4 z-50 md:hidden shadow-2xl">
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => {
+                      scrollToSection('how-it-works');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  >
+                    How it works
+                  </button>
+                  <button 
+                    onClick={() => {
+                      scrollToSection('demo');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  >
+                    Demo
+                  </button>
+                  <button 
+                    onClick={() => {
+                      scrollToSection('features');
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                  >
+                    Features
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section id="hero" className="relative pt-32 pb-32 sm:pt-48 sm:pb-48 z-10">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center text-center">
+      <section id="hero" className="relative pt-24 pb-16 sm:pt-32 sm:pb-32 lg:pt-48 lg:pb-48 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col items-center text-center">
           
           {/* Badge */}
-          <div className="animate-fade-in-up inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1f2937]/50 border border-gray-700 text-sm text-[#39d353] font-medium mb-8 backdrop-blur-md">
+          <div className="animate-fade-in-up inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1f2937]/50 border border-gray-700 text-xs sm:text-sm text-[#39d353] font-medium mb-6 sm:mb-8 backdrop-blur-md">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#39d353] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#39d353]"></span>
             </span>
-            Ethical Contribution Tracking
+            <span className="hidden sm:inline">Ethical Contribution Tracking</span>
+            <span className="sm:hidden">Ethical Tracking</span>
           </div>
 
           {/* Headline */}
-          <h1 className="animate-fade-in-up delay-100 text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 max-w-4xl leading-[1.1]">
+          <h1 className="animate-fade-in-up delay-100 text-3xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight mb-4 sm:mb-6 max-w-4xl leading-[1.1]">
             Keep your GitHub streak <br className="hidden sm:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#39d353] to-[#2ea043] text-glow">
               burning bright.
             </span>
           </h1>
 
-          <p className="animate-fade-in-up delay-200 text-xl text-gray-400 max-w-2xl mb-10 leading-relaxed">
+          <p className="animate-fade-in-up delay-200 text-base sm:text-xl text-gray-400 max-w-2xl mb-8 sm:mb-10 leading-relaxed px-4 sm:px-0">
             The intelligent companion for developers who want to build a consistent coding habit. 
             Smart reminders and micro-tasks. <span className="text-white font-medium">No bots. No fake commits.</span>
           </p>
 
           {/* Social Proof */}
-          <div className="animate-fade-in-up delay-250 flex flex-wrap items-center justify-center gap-6 mb-10 text-sm text-gray-500" role="complementary" aria-label="Platform statistics">
+          <div className="animate-fade-in-up delay-250 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 mb-8 sm:mb-10 text-xs sm:text-sm text-gray-500 px-4" role="complementary" aria-label="Platform statistics">
             <div className="flex items-center gap-2 hover:text-[#39d353] transition-colors cursor-pointer group relative" tabIndex={0}>
               <Users className="w-4 h-4 text-[#39d353] group-hover:scale-110 transition-transform" />
               <span className="font-medium">1,200+ developers</span>
@@ -252,7 +354,7 @@ const LandingPage = () => {
             <div className="h-4 w-px bg-gray-700 hidden sm:block"></div>
             <div className="flex items-center gap-2 hover:text-blue-400 transition-colors cursor-pointer group relative" tabIndex={0}>
               <Sparkles className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
-              <span className="font-medium">50M+ commits tracked</span>
+              <span className="font-medium whitespace-nowrap">50M+ commits tracked</span>
               <div className="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 transform -translate-x-1/2 text-xs bg-blue-400 text-black px-3 py-2 rounded-lg whitespace-nowrap transition-all duration-300 shadow-lg z-50">
                 Total commits analyzed
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-blue-400"></div>
@@ -261,47 +363,47 @@ const LandingPage = () => {
           </div>
 
           {/* CTAs */}
-          <div className="animate-fade-in-up delay-300 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+          <div className="animate-fade-in-up delay-300 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto max-w-sm sm:max-w-none mx-auto">
             <button 
               onClick={() => handleSignUp('hero_primary_cta')}
-              className="group w-full sm:w-auto bg-white text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all duration-300 flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(255,255,255,0.2)] active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-[#0d1117]"
-              aria-label="Sign up with GitHub to start tracking your coding streak"
+              className="group w-full sm:w-auto bg-white text-black px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg hover:bg-gray-100 transition-all duration-300 flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(255,255,255,0.2)] active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-[#0d1117]"
+              aria-label={isAuthenticated ? "Go to your dashboard" : "Sign up with GitHub to start tracking your coding streak"}
             >
-              <Github className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
-              Continue with GitHub
-              <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+              <Github className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform duration-300" />
+              <span className="whitespace-nowrap">{isAuthenticated ? 'Go to Dashboard' : 'Continue with GitHub'}</span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
             </button>
             <button 
               onClick={() => scrollToSection('demo')}
-              className="group w-full sm:w-auto px-8 py-4 rounded-xl font-bold text-lg text-gray-300 border border-gray-700 hover:border-gray-500 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 hover:bg-[#161b22] hover:-translate-y-0.5 active:scale-95 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg text-gray-300 border border-gray-700 hover:border-gray-500 hover:text-white transition-all duration-300 flex items-center justify-center gap-2 hover:bg-[#161b22] hover:-translate-y-0.5 active:scale-95 focus:outline-none focus:ring-2 focus:ring-gray-500"
               aria-label="View live demo of DailyDiff dashboard"
             >
               View Demo
-              <ChevronDown className="w-4 h-4 group-hover:translate-y-1 transition-transform duration-300" />
+              <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-y-1 transition-transform duration-300" />
             </button>
           </div>
 
           {/* Visual Demo Widget */}
-          <div id="demo" className="animate-fade-in-up delay-300 mt-48 relative w-full max-w-4xl">
+          <div id="demo" className="animate-fade-in-up delay-300 mt-16 sm:mt-32 lg:mt-48 relative w-full max-w-4xl">
             <div className="absolute -inset-1 bg-gradient-to-r from-[#2ea043] to-blue-500 rounded-2xl blur opacity-30 animate-pulse"></div>
-            <div className="relative bg-[#0d1117]/90 backdrop-blur-xl border border-gray-700 rounded-2xl p-8 shadow-2xl overflow-hidden hover:border-gray-600 transition-all duration-500">
-              <div className="flex items-center justify-between mb-8 border-b border-gray-800 pb-4">
-                <div className="flex items-center gap-3">
-                   <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+            <div className="relative bg-[#0d1117]/90 backdrop-blur-xl border border-gray-700 rounded-2xl p-4 sm:p-8 shadow-2xl overflow-hidden hover:border-gray-600 transition-all duration-500">
+              <div className="flex items-center justify-between mb-4 sm:mb-8 border-b border-gray-800 pb-3 sm:pb-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                   <div className="flex gap-1 sm:gap-1.5">
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
                   </div>
-                  <div className="h-6 w-px bg-gray-800 mx-2"></div>
-                  <span className="text-xs text-gray-500 font-mono">dashboard/overview</span>
+                  <div className="h-4 sm:h-6 w-px bg-gray-800 mx-1 sm:mx-2"></div>
+                  <span className="text-[10px] sm:text-xs text-gray-500 font-mono">dashboard/overview</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
-                  <div className="w-2 h-2 rounded-full bg-[#39d353] animate-pulse"></div>
-                  Live Preview
+                <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs font-mono text-gray-500">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#39d353] animate-pulse"></div>
+                  <span className="hidden sm:inline">Live </span>Preview
                 </div>
               </div>
               
-              <div className="grid lg:grid-cols-5 gap-8 items-start">
+              <div className="grid lg:grid-cols-5 gap-4 sm:gap-8 items-start">
                 {/* Left side - Status and Stats */}
                 <div className="lg:col-span-3 space-y-6">
                   <div className="space-y-4 text-left">
@@ -363,15 +465,18 @@ const LandingPage = () => {
       </section>
 
       {/* Bento Grid Section */}
-      <section id="how-it-works" className="pt-32 pb-24 relative z-10">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-5xl font-bold mb-6 tracking-tight">Build the habit. <br /><span className="text-[#39d353]">Keep the green.</span></h2>
+      <section id="how-it-works" className="pt-16 sm:pt-24 lg:pt-32 pb-16 sm:pb-24 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-2xl sm:text-3xl lg:text-5xl font-bold mb-4 sm:mb-6 tracking-tight px-4">
+              Build the habit. <br />
+              <span className="text-[#39d353]">Keep the green.</span>
+            </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {/* Card 1 */}
-            <div className="group md:col-span-1 glass-panel rounded-3xl p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden cursor-pointer">
+            <div className="group md:col-span-1 glass-panel rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden cursor-pointer">
               {/* Hover Tooltip */}
               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
                 <div className="bg-[#0d1117] border border-[#39d353]/50 rounded-xl px-4 py-3 text-sm text-gray-300 shadow-2xl backdrop-blur-md max-w-xs">
@@ -396,7 +501,7 @@ const LandingPage = () => {
             </div>
 
             {/* Card 2 (Wide) */}
-            <div className="group md:col-span-2 glass-panel rounded-3xl p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 cursor-pointer">
+            <div className="group md:col-span-2 glass-panel rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden flex flex-col md:flex-row items-center gap-6 sm:gap-8 cursor-pointer">
               {/* Hover Tooltip */}
               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
                 <div className="bg-[#0d1117] border border-blue-400/50 rounded-xl px-4 py-3 text-sm text-gray-300 shadow-2xl backdrop-blur-md max-w-sm">
@@ -434,7 +539,7 @@ const LandingPage = () => {
             </div>
 
             {/* Card 3 (Wide) */}
-            <div className="group md:col-span-2 glass-panel rounded-3xl p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden cursor-pointer">
+            <div className="group md:col-span-2 glass-panel rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden cursor-pointer">
                {/* Hover Tooltip */}
               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
                 <div className="bg-[#0d1117] border border-purple-400/50 rounded-xl px-4 py-3 text-sm text-gray-300 shadow-2xl backdrop-blur-md max-w-sm">
@@ -468,7 +573,7 @@ const LandingPage = () => {
             </div>
 
             {/* Card 4 */}
-            <div className="group md:col-span-1 glass-panel rounded-3xl p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden cursor-pointer">
+            <div className="group md:col-span-1 glass-panel rounded-2xl sm:rounded-3xl p-6 sm:p-8 hover:bg-[#161b22] transition-all duration-500 relative overflow-hidden cursor-pointer">
               {/* Hover Tooltip */}
               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 -translate-y-full opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50">
                 <div className="bg-[#0d1117] border border-orange-400/50 rounded-xl px-4 py-3 text-sm text-gray-300 shadow-2xl backdrop-blur-md max-w-xs">
@@ -676,31 +781,35 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 relative z-10">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="glass-panel rounded-3xl p-12 relative overflow-hidden">
+      <section className="py-16 sm:py-24 relative z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <div className="glass-panel rounded-2xl sm:rounded-3xl p-8 sm:p-12 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-[#2ea043]/20 to-blue-500/20 opacity-50"></div>
             <div className="relative z-10">
-              <h2 className="text-4xl sm:text-5xl font-bold mb-6 text-white">
+              <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 text-white">
                 Ready to build your <br />
                 <span className="text-[#39d353]">coding habit?</span>
               </h2>
-              <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
+              <p className="text-base sm:text-xl text-gray-400 mb-6 sm:mb-8 max-w-2xl mx-auto leading-relaxed px-4 sm:px-0">
                 Join thousands of developers who've transformed their consistency with DailyDiff. 
                 Start your streak today - it's completely free.
               </p>
               <button 
                 onClick={() => handleSignUp('final_cta')}
-                className="bg-white text-black px-10 py-5 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all flex items-center justify-center gap-3 mx-auto hover:-translate-y-1 hover:shadow-[0_10px_40px_rgba(255,255,255,0.2)] group focus:outline-none focus:ring-4 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[#0d1117]"
-                aria-label="Sign up with GitHub and start your coding streak today"
+                className="bg-white text-black px-6 sm:px-10 py-4 sm:py-5 rounded-xl font-bold text-base sm:text-lg hover:bg-gray-100 transition-all flex items-center justify-center gap-2 sm:gap-3 mx-auto hover:-translate-y-1 hover:shadow-[0_10px_40px_rgba(255,255,255,0.2)] group focus:outline-none focus:ring-4 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[#0d1117] w-full sm:w-auto max-w-sm sm:max-w-none"
+                aria-label={isAuthenticated ? "Go to your dashboard" : "Sign up with GitHub and start your coding streak today"}
               >
-                <Github className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                Start Your Streak Today
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <Github className="w-5 h-5 sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
+                <span className="whitespace-nowrap">{isAuthenticated ? 'Go to Your Dashboard' : 'Start Your Streak Today'}</span>
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               
-              <div className="mt-6 text-sm text-gray-500">
-                ✓ Free forever &nbsp;•&nbsp; ✓ No credit card required &nbsp;•&nbsp; ✓ Privacy-first
+              <div className="mt-4 sm:mt-6 text-xs sm:text-sm text-gray-500 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
+                <span>✓ Free forever</span>
+                <span className="hidden sm:inline">•</span>
+                <span>✓ No credit card required</span>
+                <span className="hidden sm:inline">•</span>
+                <span>✓ Privacy-first</span>
               </div>
             </div>
           </div>
@@ -708,19 +817,19 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#0d1117] border-t border-gray-800 pt-16 pb-8 relative z-10">
-        <div className="max-w-7xl mx-auto px-6">
+      <footer className="bg-[#0d1117] border-t border-gray-800 pt-12 sm:pt-16 pb-6 sm:pb-8 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           {/* Main Footer Content */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-8 sm:mb-12">
             {/* Brand Column - Takes 2 columns on larger screens */}
-            <div className="md:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="p-2 bg-gradient-to-br from-[#2ea043] to-[#238636] rounded-lg">
-                  <Flame className="w-5 h-5 text-white fill-white" />
+            <div className="sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6">
+                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-[#2ea043] to-[#238636] rounded-lg">
+                  <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-white fill-white" />
                 </div>
-                <span className="font-bold text-xl tracking-tight text-white">Daily<span className="text-[#39d353]">Diff</span></span>
+                <span className="font-bold text-lg sm:text-xl tracking-tight text-white">Daily<span className="text-[#39d353]">Diff</span></span>
               </div>
-              <p className="text-gray-500 max-w-sm mb-6 leading-relaxed">
+              <p className="text-gray-500 max-w-sm mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
                 Helping developers build lasting habits, one commit at a time. 
                 Ethical streak tracking for the modern developer.
               </p>
@@ -728,11 +837,11 @@ const LandingPage = () => {
                 <a href="https://github.com" target="_blank" rel="noopener noreferrer" 
                    className="text-gray-600 hover:text-white transition-colors duration-300 hover:scale-110 transform"
                    aria-label="Visit our GitHub">
-                  <Github className="w-5 h-5" />
+                  <Github className="w-4 h-4 sm:w-5 sm:h-5" />
                 </a>
                 <a href="#" className="text-gray-600 hover:text-white transition-colors duration-300 hover:scale-110 transform"
                    aria-label="Follow us on Twitter">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                   </svg>
                 </a>
@@ -846,12 +955,12 @@ const LandingPage = () => {
           </div>
 
           {/* Footer Bottom */}
-          <div className="border-t border-gray-800 pt-8">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-              <p className="text-gray-600 text-sm order-2 lg:order-1">
+          <div className="border-t border-gray-800 pt-6 sm:pt-8">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6">
+              <p className="text-gray-600 text-xs sm:text-sm order-2 lg:order-1">
                 © 2025 DailyDiff. All rights reserved. Made with <span className="text-red-500">❤️</span> for developers.
               </p>
-              <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500 order-1 lg:order-2">
+              <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500 order-1 lg:order-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-[#39d353]"></div>
                   <span>Privacy-first</span>
@@ -874,10 +983,10 @@ const LandingPage = () => {
       {scrolled && (
         <button
           onClick={() => scrollToSection('hero')}
-          className="fixed bottom-8 right-8 bg-[#2ea043] hover:bg-[#238636] text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#2ea043] focus:ring-offset-2 focus:ring-offset-[#0d1117] z-50"
+          className="fixed bottom-4 sm:bottom-8 right-4 sm:right-8 bg-[#2ea043] hover:bg-[#238636] text-white p-2.5 sm:p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#2ea043] focus:ring-offset-2 focus:ring-offset-[#0d1117] z-50"
           aria-label="Back to top"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
           </svg>
         </button>
@@ -885,23 +994,23 @@ const LandingPage = () => {
 
       {/* Cookie Consent Banner */}
       {showCookieConsent && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#161b22] border-t border-gray-700 p-4 z-50">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-[#161b22] border-t border-gray-700 p-3 sm:p-4 z-50">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <div className="flex-1">
-              <p className="text-sm text-gray-300">
+              <p className="text-xs sm:text-sm text-gray-300">
                 <span className="font-semibold text-white">🍪 We respect your privacy.</span> DailyDiff only uses essential cookies for authentication via GitHub OAuth. No tracking, no ads, no data selling.
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
               <button
                 onClick={() => setShowCookieConsent(false)}
-                className="text-sm text-gray-400 hover:text-white transition-colors underline"
+                className="text-xs sm:text-sm text-gray-400 hover:text-white transition-colors underline order-2 sm:order-1"
               >
                 Learn more
               </button>
               <button
-                onClick={() => setShowCookieConsent(false)}
-                className="bg-[#2ea043] hover:bg-[#238636] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                onClick={handleAcceptCookies}
+                className="bg-[#2ea043] hover:bg-[#238636] text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors order-1 sm:order-2 w-full sm:w-auto"
               >
                 Accept
               </button>

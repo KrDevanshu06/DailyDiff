@@ -15,7 +15,12 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronDown,
-  Activity
+  Activity,
+  BookOpen,
+  Lightbulb,
+  BarChart3,
+  Rocket,
+  Award
 } from 'lucide-react';
 
 // --- MOVED OUTSIDE DASHBOARD (Prevents re-renders) ---
@@ -174,6 +179,13 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
   const [targetRepo, setTargetRepo] = useState("");
   const [scheduleTime, setScheduleTime] = useState("20:00");
   const [contentMode, setContentMode] = useState("learning-log"); 
+  const [availableStrategies, setAvailableStrategies] = useState<Array<{
+    id: string;
+    label: string;
+    description: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    icon: any;
+  }>>([]);
   const [isBotActive, setIsBotActive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
@@ -256,7 +268,43 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
       }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const iconMap: { [key: string]: any } = {
+      BookOpen,
+      Lightbulb,
+      BarChart3,
+      Rocket,
+      Award
+    };
+
+    const fetchContentStrategies = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/content-strategies');
+        if (response.ok) {
+          const data = await response.json();
+          // Map icon names to actual icon components
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const strategiesWithIcons = (data.strategies || []).map((strategy: any) => ({
+            ...strategy,
+            icon: iconMap[strategy.icon] || BookOpen
+          }));
+          setAvailableStrategies(strategiesWithIcons);
+        }
+      } catch (error) {
+        console.error("Failed to fetch content strategies:", error);
+        // Fallback strategies
+        setAvailableStrategies([
+          { id: 'learning-log', label: 'Learning Log', description: 'Daily learning entries', icon: BookOpen },
+          { id: 'dev-tip', label: 'Daily Dev Tip', description: 'Practical coding tips', icon: Lightbulb },
+          { id: 'stats', label: 'GitHub Stats', description: 'Activity updates', icon: BarChart3 },
+          { id: 'project-progress', label: 'Project Progress', description: 'Development updates', icon: Rocket },
+          { id: 'code-quality', label: 'Code Quality', description: 'Quality improvements', icon: Award }
+        ]);
+      }
+    };
+
     fetchSettings();
+    fetchContentStrategies();
   }, []);
 
   const handleGenerateIdea = () => {
@@ -294,7 +342,8 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           repoName: targetRepo.trim(), 
-          message: "Manual check-in via DailyDiff Dashboard"
+          message: "", // Empty message to use content strategy
+          contentStrategy: contentMode
         }),
         credentials: 'include'
       });
@@ -394,39 +443,39 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
         <div className="relative z-10">
           {/* FIX 2: Changed to 'fixed top-0 w-full' to persist on scroll */}
           <nav className="glass-morphism border-b border-white/10 z-50 backdrop-blur-xl bg-gradient-to-r from-gray-900/80 via-gray-800/80 to-gray-900/80 shadow-2xl fixed top-0 w-full">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between relative">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 h-14 sm:h-16 flex items-center justify-between relative">
               <div className="flex items-center gap-3 group">
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-[#2ea043] to-[#39d353] rounded-xl blur-md opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
-                  <div className="relative p-2 bg-gradient-to-br from-[#2ea043] to-[#238636] rounded-xl shadow-lg ring-1 ring-white/10 group-hover:ring-white/20 transition-all duration-300 group-hover:scale-105">
-                    <Flame className="w-5 h-5 text-white drop-shadow-lg" />
+                  <div className="relative p-1.5 sm:p-2 bg-gradient-to-br from-[#2ea043] to-[#238636] rounded-xl shadow-lg ring-1 ring-white/10 group-hover:ring-white/20 transition-all duration-300 group-hover:scale-105">
+                    <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-white drop-shadow-lg" />
                   </div>
                 </div>
                 <div className="relative">
-                  <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent drop-shadow-sm select-none">
+                  <span className="font-bold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent drop-shadow-sm select-none">
                     Daily<span className="bg-gradient-to-r from-[#39d353] to-[#2ea043] bg-clip-text text-transparent">Diff</span>
                   </span>
                   <div className="absolute -bottom-1 left-0 h-0.5 w-0 bg-gradient-to-r from-[#2ea043] to-[#39d353] group-hover:w-full transition-all duration-500 rounded-full"></div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3 sm:gap-6">
                 {isLoadingSettings ? (
-                   <div className="h-7 w-28 bg-gray-800/50 rounded-full animate-pulse hidden md:block backdrop-blur-sm"></div>
+                   <div className="h-6 sm:h-7 w-20 sm:w-28 bg-gray-800/50 rounded-full animate-pulse hidden lg:block backdrop-blur-sm"></div>
                 ) : (
-                  <div className={`hidden md:flex items-center gap-3 px-4 py-2 rounded-full text-xs font-medium transition-all duration-300 backdrop-blur-md shadow-lg ring-1 ${isBotActive ? 'bg-gradient-to-r from-[#238636]/20 to-[#2ea043]/20 ring-[#238636]/30 text-[#39d353] shadow-[#238636]/20' : 'bg-gray-800/40 ring-gray-700/50 text-gray-400 shadow-black/20'}`}>
+                  <div className={`hidden lg:flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-medium transition-all duration-300 backdrop-blur-md shadow-lg ring-1 ${isBotActive ? 'bg-gradient-to-r from-[#238636]/20 to-[#2ea043]/20 ring-[#238636]/30 text-[#39d353] shadow-[#238636]/20' : 'bg-gray-800/40 ring-gray-700/50 text-gray-400 shadow-black/20'}`}>
                     <div className="relative flex items-center">
-                      <div className={`w-2.5 h-2.5 rounded-full ${isBotActive ? 'bg-[#39d353]' : 'bg-gray-600'} transition-colors`}></div>
-                      {isBotActive && <div className="absolute inset-0 w-2.5 h-2.5 bg-[#39d353] rounded-full animate-ping opacity-40"></div>}
+                      <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isBotActive ? 'bg-[#39d353]' : 'bg-gray-600'} transition-colors`}></div>
+                      {isBotActive && <div className="absolute inset-0 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-[#39d353] rounded-full animate-ping opacity-40"></div>}
                     </div>
-                    <span className="font-semibold tracking-wide">{isBotActive ? `Auto-Commit: ${scheduleTime}` : 'Automation Paused'}</span>
+                    <span className="font-semibold tracking-wide whitespace-nowrap">{isBotActive ? `Auto-Commit: ${scheduleTime}` : 'Automation Paused'}</span>
                   </div>
                 )}
                 <div className="relative" data-profile-menu>
-                  <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="group flex items-center gap-3 text-sm text-gray-300 hover:text-white transition-all duration-300 rounded-xl px-3 py-2 hover:bg-white/5 backdrop-blur-sm ring-1 ring-transparent hover:ring-white/10 shadow-lg hover:shadow-xl">
+                  <button onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)} className="group flex items-center gap-2 sm:gap-3 text-sm text-gray-300 hover:text-white transition-all duration-300 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 hover:bg-white/5 backdrop-blur-sm ring-1 ring-transparent hover:ring-white/10 shadow-lg hover:shadow-xl">
                     <div className="relative">
                       {userProfile?.avatarUrl && !avatarError ? (
-                        <div className="w-9 h-9 rounded-full border-2 border-gray-600 group-hover:border-[#39d353]/60 overflow-hidden bg-gray-800 flex-shrink-0 transition-all duration-300 shadow-lg group-hover:shadow-[#39d353]/20">
+                        <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full border-2 border-gray-600 group-hover:border-[#39d353]/60 overflow-hidden bg-gray-800 flex-shrink-0 transition-all duration-300 shadow-lg group-hover:shadow-[#39d353]/20">
                           <img src={userProfile.avatarUrl} alt={`${userProfile.username}'s avatar`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={() => setAvatarError(true)} />
                         </div>
                       ) : (
@@ -488,117 +537,182 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
             </div>
           </nav>
 
-          {/* FIX 3: Moved 'animate-fade-in-up' here and added 'pt-24' to prevent hiding behind fixed nav */}
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in-up pt-24">
-            <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          {/* FIX 3: Moved 'animate-fade-in-up' here and added 'pt-20' to prevent hiding behind fixed nav */}
+          <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-8 animate-fade-in-up pt-18 sm:pt-20">
+            <div className="mb-6 sm:mb-8 flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-white">Welcome back, {userProfile?.username || 'Dev'}!</h1>
-                <p className="text-gray-400 mt-1">Configure your automation or log a manual update.</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">Welcome back, {userProfile?.username || 'Dev'}!</h1>
+                <p className="text-gray-400 mt-1 text-sm sm:text-base">Configure your automation or log a manual update.</p>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500 glass-morphism-light px-4 py-2 rounded-lg">
-                 <Calendar size={16} />
-                 <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 glass-morphism-light px-3 sm:px-4 py-2 rounded-lg">
+                 <Calendar size={14} className="sm:w-4 sm:h-4" />
+                 <span className="whitespace-nowrap">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="glass-morphism rounded-2xl p-6 relative overflow-hidden subtle-glow">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Settings className="text-[#39d353] w-5 h-5" />
-                    <h2 className="text-xl font-bold text-white">Automation Settings</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+                <div className="glass-morphism rounded-xl sm:rounded-2xl p-4 sm:p-6 relative overflow-hidden subtle-glow">
+                  <div className="flex items-center gap-2 mb-4 sm:mb-6">
+                    <Settings className="text-[#39d353] w-4 h-4 sm:w-5 sm:h-5" />
+                    <h2 className="text-lg sm:text-xl font-bold text-white">Automation Settings</h2>
                   </div>
 
                   {isLoadingSettings ? (
-                    <div className="space-y-4 animate-pulse">
-                      <div className="h-10 bg-gray-800 rounded w-full"></div>
-                      <div className="h-10 bg-gray-800 rounded w-full"></div>
-                      <div className="h-20 bg-gray-800 rounded w-full"></div>
+                    <div className="space-y-3 sm:space-y-4 animate-pulse">
+                      <div className="h-8 sm:h-10 bg-gray-800 rounded w-full"></div>
+                      <div className="h-8 sm:h-10 bg-gray-800 rounded w-full"></div>
+                      <div className="h-16 sm:h-20 bg-gray-800 rounded w-full"></div>
                     </div>
                   ) : (
-                    <div className="grid md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><GitBranch size={14} /> Target Repository</label>
-                        <input type="text" value={targetRepo} onChange={(e) => setTargetRepo(e.target.value)} className="w-full glass-morphism-light rounded-lg px-4 py-3 text-sm text-white focus:border-[#39d353] focus:ring-2 focus:ring-[#39d353]/30 outline-none transition-all font-mono backdrop-blur-sm select-text" placeholder="username/repository-name" />
-                        <p className="text-[10px] text-gray-500">The bot will append updates to the README.md of this repo.</p>
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 sm:gap-2">
+                          <GitBranch size={12} className="sm:w-3.5 sm:h-3.5" /> Target Repository
+                        </label>
+                        <input 
+                          type="text" 
+                          value={targetRepo} 
+                          onChange={(e) => setTargetRepo(e.target.value)} 
+                          className="w-full glass-morphism-light rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:border-[#39d353] focus:ring-2 focus:ring-[#39d353]/30 outline-none transition-all font-mono backdrop-blur-sm select-text" 
+                          placeholder="username/repository-name" 
+                        />
+                        <p className="text-[9px] sm:text-[10px] text-gray-500">The bot will append updates to the README.md of this repo.</p>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Clock size={14} /> Schedule Time (Daily)</label>
-                        <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} className="w-full glass-morphism-light rounded-lg px-4 py-3 text-sm text-white focus:border-[#39d353] focus:ring-2 focus:ring-[#39d353]/30 outline-none transition-all backdrop-blur-sm select-text" />
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 sm:gap-2">
+                          <Clock size={12} className="sm:w-3.5 sm:h-3.5" /> Schedule Time (Daily)
+                        </label>
+                        <input 
+                          type="time" 
+                          value={scheduleTime} 
+                          onChange={(e) => setScheduleTime(e.target.value)} 
+                          className="w-full glass-morphism-light rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:border-[#39d353] focus:ring-2 focus:ring-[#39d353]/30 outline-none transition-all backdrop-blur-sm select-text" 
+                        />
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2"><Zap size={14} /> Content Strategy</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {[
-                            { id: 'learning-log', label: 'Learning Log', desc: 'Appends your daily notes' },
-                            { id: 'dev-tip', label: 'Daily Dev Tip', desc: 'Appends a random coding tip' },
-                            { id: 'stats', label: 'Github Stats', desc: 'Updates contribution count' }
-                          ].map((mode) => (
-                            <button key={mode.id} onClick={() => setContentMode(mode.id)} className={`p-3 rounded-lg text-left transition-all gentle-hover ${contentMode === mode.id ? 'glass-morphism border-[#238636] text-white ring-1 ring-[#238636]/30' : 'glass-morphism-light text-gray-400 hover:border-gray-600'}`}>
-                              <div className="font-bold text-xs mb-1">{mode.label}</div>
-                              <div className="text-[10px] opacity-70">{mode.desc}</div>
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 sm:gap-2">
+                          <Zap size={12} className="sm:w-3.5 sm:h-3.5" /> Content Strategy
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                          {availableStrategies.map((strategy) => (
+                            <button 
+                              key={strategy.id} 
+                              onClick={() => setContentMode(strategy.id)} 
+                              className={`p-2.5 sm:p-3 rounded-lg text-left transition-all gentle-hover ${
+                                contentMode === strategy.id 
+                                  ? 'glass-morphism border-[#238636] text-white ring-1 ring-[#238636]/30' 
+                                  : 'glass-morphism-light text-gray-400 hover:border-gray-600'
+                              }`}
+                            >
+                              <div className="font-bold text-[10px] sm:text-xs mb-1 flex items-center gap-1.5">
+                                <strategy.icon size={14} className="text-current" />
+                                <span>{strategy.label}</span>
+                              </div>
+                              <div className="text-[9px] sm:text-[10px] opacity-70">{strategy.description}</div>
                             </button>
                           ))}
                         </div>
                       </div>
                     </div>
                   )}
-                  <div className="mt-8 pt-6 border-t border-gray-800 flex items-center justify-between">
-                     <div className="flex items-center gap-2 text-yellow-500/70 text-xs glass-morphism-light ring-1 ring-yellow-500/10 px-3 py-2 rounded-lg max-w-xs backdrop-blur-sm">
-                       <AlertTriangle size={14} className="flex-shrink-0" />
-                       <span>Use responsibly. Purely automated commits may be flagged by GitHub.</span>
+                  <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                     <div className="flex items-center gap-2 text-yellow-500/70 text-[10px] sm:text-xs glass-morphism-light ring-1 ring-yellow-500/10 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg max-w-xs backdrop-blur-sm">
+                       <AlertTriangle size={12} className="sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                       <span className="leading-tight">Use responsibly. Purely automated commits may be flagged by GitHub.</span>
                      </div>
-                     <button onClick={handleSaveSettings} disabled={isSaving || isLoadingSettings} className={`flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm transition-all gentle-hover backdrop-blur-sm ${isSaving || isLoadingSettings ? 'glass-morphism-light text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-[#238636] to-[#2ea043] hover:from-[#2ea043] hover:to-[#238636] text-white shadow-lg hover:shadow-[#2ea043]/20'}`}>
-                       {isSaving ? <>Saving Config...</> : <><Save size={16} />{isBotActive ? 'Update Schedule' : 'Activate Automation'}</>}
+                     <button 
+                       onClick={handleSaveSettings} 
+                       disabled={isSaving || isLoadingSettings} 
+                       className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold text-xs sm:text-sm transition-all gentle-hover backdrop-blur-sm w-full sm:w-auto ${
+                         isSaving || isLoadingSettings 
+                           ? 'glass-morphism-light text-gray-400 cursor-not-allowed' 
+                           : 'bg-gradient-to-r from-[#238636] to-[#2ea043] hover:from-[#2ea043] hover:to-[#238636] text-white shadow-lg hover:shadow-[#2ea043]/20'
+                       }`}
+                     >
+                       {isSaving ? (
+                         <>Saving Config...</>
+                       ) : (
+                         <>
+                           <Save size={14} className="sm:w-4 sm:h-4" />
+                           {isBotActive ? 'Update Schedule' : 'Activate Automation'}
+                         </>
+                       )}
                      </button>
                   </div>
                 </div>
-                <div className="glass-morphism rounded-2xl p-6">
+                <div className="glass-morphism rounded-xl sm:rounded-2xl p-4 sm:p-6">
                   <ContributionHistory />
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="glass-morphism-light rounded-2xl p-6 flex flex-col items-center relative overflow-hidden group subtle-glow">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="glass-morphism-light rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col items-center relative overflow-hidden group subtle-glow">
                   <div className={`absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-                  <div className="absolute top-0 right-0 p-8 opacity-5"><Flame size={120} /></div>
-                  <button onClick={refreshGitHubStreak} disabled={isLoadingStreak} className="absolute top-3 right-3 p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800/50" title="Refresh GitHub streak"><RefreshCw size={16} className={isLoadingStreak ? 'animate-spin' : ''} /></button>
+                  <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-5"><Flame size={80} className="sm:w-[120px] sm:h-[120px]" /></div>
+                  <button 
+                    onClick={refreshGitHubStreak} 
+                    disabled={isLoadingStreak} 
+                    className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800/50" 
+                    title="Refresh GitHub streak"
+                  >
+                    <RefreshCw size={14} className={`sm:w-4 sm:h-4 ${isLoadingStreak ? 'animate-spin' : ''}`} />
+                  </button>
                   <div className="text-center relative z-10">
-                    <div className="mb-2 flex justify-center">
-                      <div className="p-3 bg-orange-500/10 rounded-full ring-1 ring-orange-500/30 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
-                        <Flame className="text-orange-500 w-8 h-8 fill-orange-500/20" />
+                    <div className="mb-2 sm:mb-3 flex justify-center">
+                      <div className="p-2.5 sm:p-3 bg-orange-500/10 rounded-full ring-1 ring-orange-500/30 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
+                        <Flame className="text-orange-500 w-6 h-6 sm:w-8 sm:h-8 fill-orange-500/20" />
                       </div>
                     </div>
                     {isLoadingStreak ? (
                       <>
-                        <div className="text-5xl font-bold text-gray-400 mb-1 animate-pulse tracking-tight">--</div>
-                        <div className="text-sm text-gray-500 uppercase tracking-wider font-medium">Loading...</div>
+                        <div className="text-4xl sm:text-5xl font-bold text-gray-400 mb-1 animate-pulse tracking-tight">--</div>
+                        <div className="text-xs sm:text-sm text-gray-500 uppercase tracking-wider font-medium">Loading...</div>
                       </>
                     ) : (
                       <>
-                        <div className="text-5xl font-bold text-white mb-1 tracking-tight">{streak}</div>
-                        <div className="text-sm text-gray-400 uppercase tracking-wider font-medium flex items-center gap-2 justify-center">
+                        <div className="text-4xl sm:text-5xl font-bold text-white mb-1 tracking-tight">{streak}</div>
+                        <div className="text-xs sm:text-sm text-gray-400 uppercase tracking-wider font-medium flex items-center gap-1.5 sm:gap-2 justify-center">
                           Current Streak
-                          <span className="relative flex h-2 w-2">
+                          <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500"></span>
                           </span>
                         </div>
-                        {streak > 0 && <div className="text-xs text-orange-400 mt-1 font-medium">🔥 Keep it going!</div>}
-                        {streak === 0 && <div className="text-xs text-gray-500 mt-1">Make your first commit today</div>}
-                        <div className="mt-4 text-[10px] text-gray-500 glass-morphism-light py-1.5 px-3 rounded-full shadow-sm backdrop-blur-sm">Synced</div>
+                        {streak > 0 && <div className="text-[10px] sm:text-xs text-orange-400 mt-1 font-medium">🔥 Keep it going!</div>}
+                        {streak === 0 && <div className="text-[10px] sm:text-xs text-gray-500 mt-1">Make your first commit today</div>}
+                        <div className="mt-3 sm:mt-4 text-[9px] sm:text-[10px] text-gray-500 glass-morphism-light py-1 sm:py-1.5 px-2 sm:px-3 rounded-full shadow-sm backdrop-blur-sm">Synced</div>
                       </>
                     )}
                   </div>
                 </div>
 
-                <div className="glass-morphism rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-white flex items-center gap-2"><RefreshCw size={16} className="text-blue-400" /> Manual Check-in</h3>
+                <div className="glass-morphism rounded-xl sm:rounded-2xl p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <h3 className="font-bold text-white flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base">
+                      <RefreshCw size={14} className="sm:w-4 sm:h-4 text-blue-400" /> 
+                      Manual Check-in
+                    </h3>
                   </div>
-                  <p className="text-xs text-gray-400 mb-4">Bot failed or want to commit manually? Click below to push a timestamp update immediately.</p>
-                  <button onClick={toggleCommit} className={`w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all gentle-hover backdrop-blur-sm ${todayCommitted ? 'glass-morphism text-[#39d353] border border-[#238636] ring-1 ring-[#238636]/20' : 'glass-morphism-light text-white hover:ring-1 hover:ring-white/05'}`}>
-                    {todayCommitted ? <><CheckCircle2 size={16} /> Commited for Today</> : "Push Instant Update"}
+                  <p className="text-[10px] sm:text-xs text-gray-400 mb-3 sm:mb-4 leading-relaxed">
+                    Bot failed or want to commit manually? Click below to push a timestamp update immediately.
+                  </p>
+                  <button 
+                    onClick={toggleCommit} 
+                    className={`w-full py-2.5 sm:py-3 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all gentle-hover backdrop-blur-sm ${
+                      todayCommitted 
+                        ? 'glass-morphism text-[#39d353] border border-[#238636] ring-1 ring-[#238636]/20' 
+                        : 'glass-morphism-light text-white hover:ring-1 hover:ring-white/05'
+                    }`}
+                  >
+                    {todayCommitted ? (
+                      <>
+                        <CheckCircle2 size={14} className="sm:w-4 sm:h-4" /> 
+                        Commited for Today
+                      </>
+                    ) : (
+                      "Push Instant Update"
+                    )}
                   </button>
                 </div>
 
