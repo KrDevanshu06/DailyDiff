@@ -18,10 +18,11 @@ const PORT = process.env.PORT || 3000;
 
 // --- 1. CONFIGURATION ---
 const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  process.env.CLIENT_URL // This will be your Vercel URL (e.g., https://dailydiff.vercel.app)
-];
+  process.env.CLIENT_URL, // Production frontend URL from environment
+  process.env.CLIENT_URL_BRANCH, // Branch deployment URL (optional)
+  'http://localhost:5173', // Local development
+  'http://127.0.0.1:5173'
+].filter(Boolean); // Remove any undefined values
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -42,10 +43,10 @@ app.set('trust proxy', 1); // Critical for Railway/Heroku cookies
 
 app.use(cookieSession({
   name: 'session',
-  keys: [process.env.SESSION_SECRET || 'daily_diff_secure_key'],
+  keys: [process.env.SESSION_SECRET || 'daily_diff_secure_key_fallback'],
   maxAge: 24 * 60 * 60 * 1000,
-  secure: process.env.NODE_ENV === 'production', // True in production (Railway), False in dev
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site
+  secure: process.env.NODE_ENV === 'production', // Secure only in production
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   httpOnly: true
 }));
 
@@ -58,9 +59,11 @@ const supabase = createClient(
 // Log startup configuration
 const environment = process.env.NODE_ENV || 'development';
 console.log(`🔧 [CONFIG] Environment: ${environment}`);
-console.log(`🔧 [CONFIG] Allowed origins: ${allowedOrigins.filter(Boolean).join(', ')}`);
+console.log(`🔧 [CONFIG] Allowed origins: ${allowedOrigins.join(', ')}`);
 console.log(`🔧 [CONFIG] Supabase connected: ${process.env.SUPABASE_URL ? '✅' : '❌'}`);
 console.log(`🔧 [CONFIG] GitHub OAuth: ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`);
+console.log(`🔧 [CONFIG] Server URL: ${process.env.SERVER_URL || 'localhost'}`);
+console.log(`🔧 [CONFIG] Client URL: ${process.env.CLIENT_URL || 'localhost'}`);
 console.log('---');
 
 // ================================================================
@@ -72,7 +75,7 @@ const streakCache = new Map();
 
 app.get('/auth/github', (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
-  const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+  const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
   const redirectUri = `${serverUrl}/auth/github/callback`;
   const scope = 'repo user'; 
   
@@ -594,4 +597,17 @@ app.listen(PORT, () => {
   console.log(`⚡ Port: ${PORT}`);
   console.log(`🕐 Started at: ${new Date().toLocaleString()}`);
   console.log('=====================================\n');
+  
+  // Validate required environment variables in production
+  if (environment === 'production') {
+    const requiredEnvVars = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SESSION_SECRET', 'SERVER_URL', 'CLIENT_URL'];
+    const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
+    
+    if (missing.length > 0) {
+      console.error('🚨 Missing required environment variables:', missing.join(', '));
+      console.error('⚠️  Server may not function correctly without these variables');
+    } else {
+      console.log('✅ All required environment variables are set');
+    }
+  }
 });
