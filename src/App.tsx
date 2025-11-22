@@ -29,13 +29,12 @@ function App() {
           console.log("Session Check:", data);
           
           if (data.authenticated) {
-            // Allow authenticated users to stay on landing page
-            // Only redirect to dashboard if they're trying to access it directly
-            // or coming from OAuth callback
-            if (location.pathname === '/auth/github/callback') {
+            // FIX: Auto-redirect to dashboard if user is on Root or Callback URLs
+            if (location.pathname === '/' || location.pathname === '/auth/github/callback') {
+              console.log("✅ Authenticated. Redirecting to Dashboard...");
               navigate('/dashboard');
             }
-            // Don't auto-redirect from '/' - let them choose to continue
+            // If they are already on /dashboard, do nothing (let them stay)
           } else {
             // If NOT authenticated and trying to access dashboard, kick to home
             if (location.pathname === '/dashboard') {
