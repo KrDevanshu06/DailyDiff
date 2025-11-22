@@ -22,6 +22,7 @@ import {
   Rocket,
   Award
 } from 'lucide-react';
+import API_URL from '../config';
 
 // --- MOVED OUTSIDE DASHBOARD (Prevents re-renders) ---
 interface ContributionDay {
@@ -53,7 +54,7 @@ const ContributionHistory = () => {
   useEffect(() => {
     const fetchContributions = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/contributions', { credentials: 'include' });
+        const response = await fetch(`${API_URL}/api/contributions`, { credentials: 'include' });
         if (response.ok) {
           const data = await response.json();
           if (data.contributions && data.contributions.length > 0) {
@@ -217,7 +218,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/user', {
+        const response = await fetch(`${API_URL}/api/user`, {
           credentials: 'include'
         });
         
@@ -248,7 +249,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/schedule', {
+        const response = await fetch(`${API_URL}/api/schedule`, {
           credentials: 'include'
         });
         
@@ -279,7 +280,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
 
     const fetchContentStrategies = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/content-strategies');
+        const response = await fetch(`${API_URL}/api/content-strategies`);
         if (response.ok) {
           const data = await response.json();
           // Map icon names to actual icon components
@@ -337,7 +338,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/commit-now', {
+      const response = await fetch(`${API_URL}/api/commit-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -365,7 +366,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
   const refreshGitHubStreak = async () => {
     setIsLoadingStreak(true);
     try {
-      const response = await fetch('http://localhost:3000/api/user', {
+      const response = await fetch(`${API_URL}/api/user`, {
         credentials: 'include'
       });
       
@@ -387,7 +388,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
     setIsSaving(true);
     
     try {
-      const response = await fetch('http://localhost:3000/api/schedule', {
+      const response = await fetch(`${API_URL}/api/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

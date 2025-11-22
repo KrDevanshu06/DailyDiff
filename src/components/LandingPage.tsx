@@ -18,6 +18,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import API_URL from '../config';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ const LandingPage = () => {
     // Check if user is authenticated
     const checkAuth = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/user', {
+        const response = await fetch(`${API_URL}/api/user`, {
           credentials: 'include'
         });
         if (response.ok) {
@@ -152,7 +153,7 @@ const LandingPage = () => {
       utm_content: 'github_oauth'
     });
     
-    window.location.href = `http://localhost:3000/auth/github?${params.toString()}`;
+    window.location.href = `${API_URL}/auth/github?${params.toString()}`;
   };
 
   // Handle cookie consent acceptance
