@@ -461,6 +461,52 @@ app.post('/api/logout', (req, res) => {
   res.json({ status: "logged out" });
 });
 
+// Debug endpoint to check active schedules
+app.get('/api/debug/schedules', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('schedules')
+      .select(`
+        id,
+        target_repo,
+        content_mode,
+        schedule_time,
+        is_active,
+        last_run_at,
+        created_at,
+        user_github_id,
+        users!inner (
+          username,
+          access_token
+        )
+      `)
+      .eq('is_active', true);
+
+    if (error) throw error;
+
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    res.json({ 
+      currentTime,
+      totalActiveSchedules: data?.length || 0,
+      schedules: data?.map(schedule => ({
+        id: schedule.id,
+        target_repo: schedule.target_repo,
+        content_mode: schedule.content_mode,
+        schedule_time: schedule.schedule_time,
+        last_run_at: schedule.last_run_at,
+        created_at: schedule.created_at,
+        username: schedule.users?.username,
+        hasToken: !!schedule.users?.access_token
+      })) || []
+    });
+  } catch (error) {
+    console.error("Debug schedules error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Test endpoint for contribution data (no auth required)
 app.get('/api/test-contributions', (req, res) => {
   console.log('🧪 Test contributions endpoint called');
@@ -523,7 +569,11 @@ cron.schedule('* * * * *', async () => {
             id,
             target_repo,
             content_mode,
-            users (access_token)
+            user_github_id,
+            users!inner (
+              access_token,
+              username
+            )
           `)
           .eq('is_active', true)
           .eq('schedule_time', currentTime);
@@ -544,16 +594,19 @@ cron.schedule('* * * * *', async () => {
 
     if (error) throw error;
 
+    console.log(`   📊 Found ${schedules?.length || 0} active schedules for time ${currentTime}`);
+    
     if (schedules && schedules.length > 0) {
       console.log(`🚀 [CRON] Executing ${schedules.length} scheduled job(s)`);
       
       // 2. Run jobs with individual error handling
       for (const job of schedules) {
         const token = job.users?.access_token;
+        const username = job.users?.username;
         
         if (token) {
           try {
-            console.log(`   📦 Processing automated commit for: ${job.target_repo}`);
+            console.log(`   📦 Processing automated commit for: ${job.target_repo} (user: ${username})`);
             
             // Add timeout wrapper for the entire operation
             const result = await Promise.race([
@@ -562,7 +615,7 @@ cron.schedule('* * * * *', async () => {
                 job.target_repo, 
                 "", // Empty message to use content strategy
                 job.content_mode || 'learning-log', // Use configured content strategy
-                job.users?.username // Pass username for personalized content
+                username // Pass username for personalized content
               ),
               new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Job timeout after 30 seconds')), 30000)
