@@ -138,7 +138,7 @@ app.get('/auth/github/callback', async (req, res) => {
         github_id: githubUser.id.toString(),
         username: githubUser.login,
         email: githubUser.email,
-        // avatar_url: githubUser.avatar_url, // Temporarily commented until DB column is added
+        avatar_url: githubUser.avatar_url, // Temporarily commented until DB column is added
         access_token: accessToken
       });
 
