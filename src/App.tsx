@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 import { Flame, GitBranch, CheckCircle2 } from 'lucide-react';
+import API_URL from './config';
 
 function App() {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ function App() {
     const verifySession = async () => {
       try {
         // Ask backend: "Do I have a valid cookie?"
-        const response = await fetch('http://localhost:3000/api/user', {
+        const response = await fetch(`${API_URL}/api/user`, {
           credentials: 'include' 
         });
         
@@ -102,7 +103,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:3000/api/logout', { 
+      await fetch(`${API_URL}/api/logout`, { 
         method: 'POST',
         credentials: 'include' 
       });

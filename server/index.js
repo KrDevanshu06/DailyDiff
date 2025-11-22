@@ -14,20 +14,39 @@ import path from 'path';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // --- 1. CONFIGURATION ---
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.CLIENT_URL // This will be your Vercel URL (e.g., https://dailydiff.vercel.app)
+];
+
 app.use(cors({
-  // Allow both localhost variations to prevent cookie blocking
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], 
-  credentials: true 
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
 
 app.use(express.json());
+
+app.set('trust proxy', 1); // Critical for Railway/Heroku cookies
+
 app.use(cookieSession({
   name: 'session',
-  keys: [process.env.SESSION_SECRET || 'daily_diff_secure_key'], 
-  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  keys: [process.env.SESSION_SECRET || 'daily_diff_secure_key'],
+  maxAge: 24 * 60 * 60 * 1000,
+  secure: process.env.NODE_ENV === 'production', // True in production (Railway), False in dev
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-site
+  httpOnly: true
 }));
 
 // Initialize Supabase
@@ -45,7 +64,8 @@ const streakCache = new Map();
 
 app.get('/auth/github', (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
-  const redirectUri = 'http://localhost:3000/auth/github/callback';
+  const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+  const redirectUri = `${serverUrl}/auth/github/callback`;
   const scope = 'repo user'; 
   
   console.log("Initiating GitHub Auth...");
@@ -100,7 +120,8 @@ app.get('/auth/github/callback', async (req, res) => {
     console.log(`User ${githubUser.login} logged in!`);
     
     // E. Redirect back to Frontend
-    res.redirect('http://localhost:5173/?login=success');
+    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/dashboard?login=success`);
 
   } catch (error) {
     console.error("Auth Failed:", error.message);
