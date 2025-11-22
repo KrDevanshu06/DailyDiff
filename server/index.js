@@ -16,6 +16,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// --- REQUEST LOGGING MIDDLEWARE ---
+app.use((req, res, next) => {
+  const timestamp = new Date().toLocaleTimeString();
+  const origin = req.headers.origin || 'Direct';
+  console.log(`📢 [${timestamp}] ${req.method} ${req.path} from ${origin}`);
+  next();
+});
+
 // --- 1. CONFIGURATION ---
 const allowedOrigins = [
   process.env.CLIENT_URL, // Production frontend URL from environment
