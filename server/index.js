@@ -240,7 +240,7 @@ app.get('/api/schedule', async (req, res) => {
 app.post('/api/schedule', async (req, res) => {
   if (!req.session.githubId) return res.status(401).json({ error: "Unauthorized" });
 
-  const { repoName, scheduleTime, contentMode } = req.body;
+  const { repoName, scheduleTime, contentMode, timezone } = req.body;
   
   const { error } = await supabase
     .from('schedules')
@@ -249,11 +249,13 @@ app.post('/api/schedule', async (req, res) => {
       target_repo: repoName,
       schedule_time: scheduleTime,
       content_mode: contentMode,
+      timezone: timezone || 'UTC', // Default to UTC if no timezone provided
       is_active: true
     }, { onConflict: 'user_github_id' });
 
   if (error) return res.status(500).json({ error: error.message });
   
+  console.log(`✅ Schedule saved for ${req.session.username}: ${scheduleTime} (${timezone || 'UTC'})`);
   res.json({ status: "success", message: "Schedule active" });
 });
 
@@ -471,6 +473,7 @@ app.get('/api/debug/schedules', async (req, res) => {
         target_repo,
         content_mode,
         schedule_time,
+        timezone,
         is_active,
         last_run_at,
         created_at,
@@ -495,6 +498,7 @@ app.get('/api/debug/schedules', async (req, res) => {
         target_repo: schedule.target_repo,
         content_mode: schedule.content_mode,
         schedule_time: schedule.schedule_time,
+        timezone: schedule.timezone,
         last_run_at: schedule.last_run_at,
         created_at: schedule.created_at,
         username: schedule.users?.username,
@@ -543,7 +547,7 @@ cron.schedule('* * * * *', async () => {
   const currentMinute = String(now.getMinutes()).padStart(2, '0');
   const currentTime = `${currentHour}:${currentMinute}`;
   
-  console.log(`⏰ [CRON] Checking automated schedules for ${currentTime} (${process.env.NODE_ENV || 'dev'})`);
+  console.log(`⏰ [CRON] Tick at server time (UTC): ${now.toISOString()} | Local: ${currentTime} (${process.env.NODE_ENV || 'dev'})`);
 
   try {
     // Quick network connectivity check
@@ -569,14 +573,15 @@ cron.schedule('* * * * *', async () => {
             id,
             target_repo,
             content_mode,
+            schedule_time,
+            timezone,
             user_github_id,
             users!inner (
               access_token,
               username
             )
           `)
-          .eq('is_active', true)
-          .eq('schedule_time', currentTime);
+          .eq('is_active', true);
         
         schedules = result.data;
         error = result.error;
@@ -594,19 +599,33 @@ cron.schedule('* * * * *', async () => {
 
     if (error) throw error;
 
-    console.log(`   📊 Found ${schedules?.length || 0} active schedules for time ${currentTime}`);
+    console.log(`   📊 Found ${schedules?.length || 0} active schedules`);
     
     if (schedules && schedules.length > 0) {
-      console.log(`🚀 [CRON] Executing ${schedules.length} scheduled job(s)`);
-      
-      // 2. Run jobs with individual error handling
+      // 2. Check each schedule with timezone conversion
       for (const job of schedules) {
         const token = job.users?.access_token;
         const username = job.users?.username;
         
-        if (token) {
+        // --- TIMEZONE LOGIC START ---
+        // Convert current UTC time to User's Timezone
+        const userTimeString = new Date().toLocaleTimeString('en-US', {
+          timeZone: job.timezone || 'UTC',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false // 24h format "HH:MM"
+        });
+        
+        // Compare "14:30" (User Time) with "14:30" (Schedule Time)
+        const [userHour, userMinute] = userTimeString.split(':');
+        const [schedHour, schedMinute] = job.schedule_time.split(':');
+        
+        const isTimeMatch = (userHour == schedHour) && (userMinute == schedMinute);
+        // --- TIMEZONE LOGIC END ---
+
+        if (isTimeMatch && token) {
           try {
-            console.log(`   📦 Processing automated commit for: ${job.target_repo} (user: ${username})`);
+            console.log(`   🚀 Triggering job for ${username} at ${userTimeString} (${job.timezone || 'UTC'}) - repo: ${job.target_repo}`);
             
             // Add timeout wrapper for the entire operation
             const result = await Promise.race([
@@ -622,7 +641,6 @@ cron.schedule('* * * * *', async () => {
               )
             ]);
 
-            // 3. UPDATE DB TIMESTAMP ON SUCCESS
             if (result.success) {
               const { error: updateError } = await supabase
                 .from('schedules')
@@ -630,21 +648,16 @@ cron.schedule('* * * * *', async () => {
                 .eq('id', job.id);
                 
               if (updateError) console.error("   ❌ Failed to update DB timestamp:", updateError);
-              else console.log("   ✅ Database timestamp updated.");
+              else console.log(`   ✅ Job success for ${username}`);
             } else {
-              console.error(`   ❌ Job failed for ${job.target_repo}:`, result.error);
+              console.error(`   ❌ Job failed for ${username}:`, result.error);
             }
           } catch (jobError) {
-            console.error(`   ❌ Critical error processing job for ${job.target_repo}:`, {
+            console.error(`   ❌ Critical error processing job for ${username}:`, {
               message: jobError.message,
               details: jobError.stack?.substring(0, 200) + '...' || 'No stack trace'
             });
-            
-            // Continue processing other jobs even if one fails
-            continue;
           }
-        } else {
-          console.warn(`   ⚠️ No access token found for job ID: ${job.id}`);
         }
       }
     }

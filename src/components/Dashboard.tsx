@@ -20,7 +20,8 @@ import {
   Lightbulb,
   BarChart3,
   Rocket,
-  Award
+  Award,
+  Globe // New Icon for timezone
 } from 'lucide-react';
 import API_URL from '../config';
 
@@ -218,6 +219,8 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
   
   const [targetRepo, setTargetRepo] = useState("");
   const [scheduleTime, setScheduleTime] = useState("20:00");
+  // NEW: Timezone State
+  const [userTimezone, setUserTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [contentMode, setContentMode] = useState("learning-log"); 
   const [availableStrategies, setAvailableStrategies] = useState<Array<{
     id: string;
@@ -234,6 +237,18 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
   const [loadingIdea, setLoadingIdea] = useState(false);
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+
+  // List of common timezones
+  const commonTimezones = [
+    "UTC",
+    "Asia/Kolkata",
+    "America/Los_Angeles", 
+    "America/New_York",
+    "Europe/London",
+    "Europe/Berlin",
+    "Asia/Tokyo",
+    "Australia/Sydney"
+  ];
 
   useEffect(() => {
     handleGenerateIdea();
@@ -299,6 +314,10 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
             setScheduleTime(data.schedule.schedule_time);
             setContentMode(data.schedule.content_mode);
             setIsBotActive(data.schedule.is_active);
+            // Load saved timezone or default to user's browser if not set
+            if (data.schedule.timezone) {
+              setUserTimezone(data.schedule.timezone);
+            }
           }
         }
       } catch (error) {
@@ -433,7 +452,8 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
         body: JSON.stringify({
           repoName: targetRepo,
           scheduleTime: scheduleTime,
-          contentMode: contentMode
+          contentMode: contentMode,
+          timezone: userTimezone // Sending timezone to backend
         }),
         credentials: 'include'
       });
@@ -442,7 +462,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
 
       if (response.ok) {
         setIsBotActive(true);
-        alert(`✅ Schedule Saved! Bot will run daily at ${scheduleTime}`);
+        alert(`✅ Schedule Saved! Bot will run daily at ${scheduleTime} (${userTimezone})`);
       } else {
         alert("❌ Error saving schedule: " + (data.error || "Unknown error"));
       }
@@ -623,12 +643,30 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 sm:gap-2">
                           <Clock size={12} className="sm:w-3.5 sm:h-3.5" /> Schedule Time (Daily)
                         </label>
-                        <input 
-                          type="time" 
-                          value={scheduleTime} 
-                          onChange={(e) => setScheduleTime(e.target.value)} 
-                          className="w-full glass-morphism-light rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:border-[#39d353] focus:ring-2 focus:ring-[#39d353]/30 outline-none transition-all backdrop-blur-sm select-text" 
-                        />
+                        <div className="flex gap-2">
+                          <input 
+                            type="time" 
+                            value={scheduleTime} 
+                            onChange={(e) => setScheduleTime(e.target.value)} 
+                            className="flex-1 glass-morphism-light rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:border-[#39d353] focus:ring-2 focus:ring-[#39d353]/30 outline-none transition-all backdrop-blur-sm select-text" 
+                          />
+                          {/* Timezone Select */}
+                          <div className="relative w-1/2">
+                            <select 
+                              value={userTimezone} 
+                              onChange={(e) => setUserTimezone(e.target.value)}
+                              className="w-full glass-morphism-light rounded-lg pl-8 pr-2 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:border-[#39d353] focus:ring-2 focus:ring-[#39d353]/30 outline-none transition-all backdrop-blur-sm appearance-none cursor-pointer truncate"
+                            >
+                              {commonTimezones.map(tz => (
+                                <option key={tz} value={tz} className="bg-gray-900">{tz}</option>
+                              ))}
+                              {!commonTimezones.includes(userTimezone) && (
+                                <option value={userTimezone} className="bg-gray-900">{userTimezone}</option>
+                              )}
+                            </select>
+                            <Globe size={12} className="absolute left-2.5 top-3 sm:top-3.5 text-gray-400 pointer-events-none" />
+                          </div>
+                        </div>
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 sm:gap-2">
