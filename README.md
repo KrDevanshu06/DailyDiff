@@ -47,7 +47,7 @@
 
 | **Landing Page** | **Developer Dashboard** |
 |:---:|:---:|
-| *[Insert Screenshot of Landing Page]* | *[Insert Screenshot of Dashboard]* |
+| <img width="1919" height="915" alt="image" src="https://github.com/user-attachments/assets/d120c6e6-eb4f-4486-af73-8e17a8d14176" /> | <img width="1327" height="911" alt="image" src="https://github.com/user-attachments/assets/0a3e8a19-57bf-4dfc-87fb-592b39f7d70f" /> |
 
 ---
 
@@ -63,7 +63,7 @@
 
 1.  **Clone the repository**
     ```bash
-    git clone [https://github.com/yourusername/dailydiff.git](https://github.com/yourusername/dailydiff.git)
+    git clone https://github.com/krdevanshu06/dailydiff.git
     cd dailydiff
     ```
 
