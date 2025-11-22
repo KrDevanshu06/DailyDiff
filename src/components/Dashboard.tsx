@@ -15,7 +15,12 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronDown,
-  Activity
+  Activity,
+  BookOpen,
+  Lightbulb,
+  BarChart3,
+  Rocket,
+  Award
 } from 'lucide-react';
 
 // --- MOVED OUTSIDE DASHBOARD (Prevents re-renders) ---
@@ -174,6 +179,13 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
   const [targetRepo, setTargetRepo] = useState("");
   const [scheduleTime, setScheduleTime] = useState("20:00");
   const [contentMode, setContentMode] = useState("learning-log"); 
+  const [availableStrategies, setAvailableStrategies] = useState<Array<{
+    id: string;
+    label: string;
+    description: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    icon: any;
+  }>>([]);
   const [isBotActive, setIsBotActive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
@@ -256,7 +268,43 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
       }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const iconMap: { [key: string]: any } = {
+      BookOpen,
+      Lightbulb,
+      BarChart3,
+      Rocket,
+      Award
+    };
+
+    const fetchContentStrategies = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/content-strategies');
+        if (response.ok) {
+          const data = await response.json();
+          // Map icon names to actual icon components
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const strategiesWithIcons = (data.strategies || []).map((strategy: any) => ({
+            ...strategy,
+            icon: iconMap[strategy.icon] || BookOpen
+          }));
+          setAvailableStrategies(strategiesWithIcons);
+        }
+      } catch (error) {
+        console.error("Failed to fetch content strategies:", error);
+        // Fallback strategies
+        setAvailableStrategies([
+          { id: 'learning-log', label: 'Learning Log', description: 'Daily learning entries', icon: BookOpen },
+          { id: 'dev-tip', label: 'Daily Dev Tip', description: 'Practical coding tips', icon: Lightbulb },
+          { id: 'stats', label: 'GitHub Stats', description: 'Activity updates', icon: BarChart3 },
+          { id: 'project-progress', label: 'Project Progress', description: 'Development updates', icon: Rocket },
+          { id: 'code-quality', label: 'Code Quality', description: 'Quality improvements', icon: Award }
+        ]);
+      }
+    };
+
     fetchSettings();
+    fetchContentStrategies();
   }, []);
 
   const handleGenerateIdea = () => {
@@ -294,7 +342,8 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           repoName: targetRepo.trim(), 
-          message: "Manual check-in via DailyDiff Dashboard"
+          message: "", // Empty message to use content strategy
+          contentStrategy: contentMode
         }),
         credentials: 'include'
       });
@@ -545,23 +594,22 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 sm:gap-2">
                           <Zap size={12} className="sm:w-3.5 sm:h-3.5" /> Content Strategy
                         </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                          {[
-                            { id: 'learning-log', label: 'Learning Log', desc: 'Appends your daily notes' },
-                            { id: 'dev-tip', label: 'Daily Dev Tip', desc: 'Appends a random coding tip' },
-                            { id: 'stats', label: 'Github Stats', desc: 'Updates contribution count' }
-                          ].map((mode) => (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                          {availableStrategies.map((strategy) => (
                             <button 
-                              key={mode.id} 
-                              onClick={() => setContentMode(mode.id)} 
+                              key={strategy.id} 
+                              onClick={() => setContentMode(strategy.id)} 
                               className={`p-2.5 sm:p-3 rounded-lg text-left transition-all gentle-hover ${
-                                contentMode === mode.id 
+                                contentMode === strategy.id 
                                   ? 'glass-morphism border-[#238636] text-white ring-1 ring-[#238636]/30' 
                                   : 'glass-morphism-light text-gray-400 hover:border-gray-600'
                               }`}
                             >
-                              <div className="font-bold text-[10px] sm:text-xs mb-1">{mode.label}</div>
-                              <div className="text-[9px] sm:text-[10px] opacity-70">{mode.desc}</div>
+                              <div className="font-bold text-[10px] sm:text-xs mb-1 flex items-center gap-1.5">
+                                <strategy.icon size={14} className="text-current" />
+                                <span>{strategy.label}</span>
+                              </div>
+                              <div className="text-[9px] sm:text-[10px] opacity-70">{strategy.description}</div>
                             </button>
                           ))}
                         </div>
