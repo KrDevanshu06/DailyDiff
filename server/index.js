@@ -55,6 +55,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// Log startup configuration
+const environment = process.env.NODE_ENV || 'development';
+console.log(`🔧 [CONFIG] Environment: ${environment}`);
+console.log(`🔧 [CONFIG] Allowed origins: ${allowedOrigins.filter(Boolean).join(', ')}`);
+console.log(`🔧 [CONFIG] Supabase connected: ${process.env.SUPABASE_URL ? '✅' : '❌'}`);
+console.log(`🔧 [CONFIG] GitHub OAuth: ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`);
+console.log('---');
+
 // ================================================================
 // IN-MEMORY CACHES FOR RATE LIMIT PREVENTION
 // ================================================================
@@ -68,10 +76,9 @@ app.get('/auth/github', (req, res) => {
   const redirectUri = `${serverUrl}/auth/github/callback`;
   const scope = 'repo user'; 
   
-  console.log("Initiating GitHub Auth...");
+  console.log(`🔐 GitHub OAuth initiated - Redirect URI: ${redirectUri}`);
   
-  // CHANGE IS HERE: Added "&prompt=consent"
-  // This forces the GitHub permission screen to show every time
+  // This forces the GitHub permission screen to show every time for better UX
   res.redirect(`https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&prompt=consent`);
 });
 
@@ -117,15 +124,17 @@ app.get('/auth/github/callback', async (req, res) => {
     req.session.avatarUrl = githubUser.avatar_url;
     req.session.token = accessToken; 
 
-    console.log(`User ${githubUser.login} logged in!`);
+    console.log(`✅ User authentication successful: ${githubUser.login}`);
     
     // E. Redirect back to Frontend
     const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    console.log(`🔄 Redirecting to frontend: ${frontendUrl}/dashboard`);
     res.redirect(`${frontendUrl}/dashboard?login=success`);
 
   } catch (error) {
-    console.error("Auth Failed:", error.message);
-    res.status(500).send(`Authentication failed: ${error.message}`);
+    console.error("❌ GitHub OAuth failed:", error.message);
+    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}?error=auth_failed&message=${encodeURIComponent(error.message)}`);
   }
 });
 
@@ -462,7 +471,7 @@ cron.schedule('* * * * *', async () => {
   const currentMinute = String(now.getMinutes()).padStart(2, '0');
   const currentTime = `${currentHour}:${currentMinute}`;
   
-  console.log(`⏰ Checking schedules for ${currentTime}...`);
+  console.log(`⏰ [CRON] Checking automated schedules for ${currentTime} (${process.env.NODE_ENV || 'dev'})`);
 
   try {
     // Quick network connectivity check
@@ -510,7 +519,7 @@ cron.schedule('* * * * *', async () => {
     if (error) throw error;
 
     if (schedules && schedules.length > 0) {
-      console.log(`🚀 Found ${schedules.length} jobs to run!`);
+      console.log(`🚀 [CRON] Executing ${schedules.length} scheduled job(s)`);
       
       // 2. Run jobs with individual error handling
       for (const job of schedules) {
@@ -518,7 +527,7 @@ cron.schedule('* * * * *', async () => {
         
         if (token) {
           try {
-            console.log(`   -> Processing job for repo: ${job.target_repo}`);
+            console.log(`   📦 Processing automated commit for: ${job.target_repo}`);
             
             // Add timeout wrapper for the entire operation
             const result = await Promise.race([
@@ -573,5 +582,16 @@ cron.schedule('* * * * *', async () => {
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Backend running at http://localhost:${PORT}`);
+  const environment = process.env.NODE_ENV || 'development';
+  const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  
+  console.log('\n🚀 DailyDiff Backend Server Started');
+  console.log('=====================================');
+  console.log(`📍 Environment: ${environment}`);
+  console.log(`🌐 Server URL: ${serverUrl}`);
+  console.log(`🔗 Frontend URL: ${clientUrl}`);
+  console.log(`⚡ Port: ${PORT}`);
+  console.log(`🕐 Started at: ${new Date().toLocaleString()}`);
+  console.log('=====================================\n');
 });
