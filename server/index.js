@@ -11,10 +11,28 @@ import { getAvailableStrategies } from './contentStrategies.js';
 import { promises as fs } from 'fs';
 import path from 'path'; 
 
-dotenv.config();
+// Load environment variables with local development priority
+const environment = process.env.NODE_ENV || 'development';
+if (environment === 'development') {
+  // Try .env.local first for local development
+  const result = dotenv.config({ path: '.env.local' });
+  console.log('📁 Loading local development environment (.env.local)');
+  console.log('🔍 Environment loading result:', result.error ? result.error.message : `Loaded ${Object.keys(result.parsed || {}).length} variables`);
+  console.log('🔍 SUPABASE_URL exists:', !!process.env.SUPABASE_URL);
+  console.log('🔍 SUPABASE_URL value:', process.env.SUPABASE_URL ? 'Set' : 'Not set');
+} else {
+  // Use default .env for production
+  dotenv.config();
+  console.log('📁 Loading production environment (.env)');
+}
 
+// Initialize Express app and configuration constants
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Dynamic URL Configuration (must be after dotenv.config())
+const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // --- REQUEST LOGGING MIDDLEWARE ---
 app.use((req, res, next) => {
@@ -79,14 +97,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// Log startup configuration
-const environment = process.env.NODE_ENV || 'development';
+// Log startup configuration with enhanced URL info
 console.log(`🔧 [CONFIG] Environment: ${environment}`);
+console.log(`🔧 [CONFIG] Server URL: ${SERVER_URL}`);
+console.log(`🔧 [CONFIG] Client URL: ${CLIENT_URL}`);
 console.log(`🔧 [CONFIG] Allowed origins: ${allowedOrigins.join(', ')}`);
 console.log(`🔧 [CONFIG] Supabase connected: ${process.env.SUPABASE_URL ? '✅' : '❌'}`);
 console.log(`🔧 [CONFIG] GitHub OAuth: ${process.env.GITHUB_CLIENT_ID ? '✅' : '❌'}`);
-console.log(`🔧 [CONFIG] Server URL: ${process.env.SERVER_URL || 'localhost'}`);
-console.log(`🔧 [CONFIG] Client URL: ${process.env.CLIENT_URL || 'localhost'}`);
+
+// Enhanced environment validation
+if (environment === 'production') {
+  const requiredVars = ['SERVER_URL', 'CLIENT_URL', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'];
+  const missing = requiredVars.filter(varName => !process.env[varName]);
+  if (missing.length > 0) {
+    console.error(`� [CONFIG] Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
 console.log('---');
 
 // ================================================================
@@ -98,8 +124,7 @@ const streakCache = new Map();
 
 app.get('/auth/github', (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
-  const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
-  const redirectUri = `${serverUrl}/auth/github/callback`;
+  const redirectUri = `${SERVER_URL}/auth/github/callback`;
   const scope = 'repo user'; 
   
   console.log(`🔐 GitHub OAuth initiated - Redirect URI: ${redirectUri}`);
@@ -153,14 +178,12 @@ app.get('/auth/github/callback', async (req, res) => {
     console.log(`✅ User authentication successful: ${githubUser.login}`);
     
     // E. Redirect back to Frontend
-    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    console.log(`🔄 Redirecting to frontend: ${frontendUrl}/dashboard`);
-    res.redirect(`${frontendUrl}/dashboard?login=success`);
+    console.log(`🔄 Redirecting to frontend: ${CLIENT_URL}/dashboard`);
+    res.redirect(`${CLIENT_URL}/dashboard?login=success`);
 
   } catch (error) {
     console.error("❌ GitHub OAuth failed:", error.message);
-    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}?error=auth_failed&message=${encodeURIComponent(error.message)}`);
+    res.redirect(`${CLIENT_URL}?error=auth_failed&message=${encodeURIComponent(error.message)}`);
   }
 });
 
@@ -674,17 +697,18 @@ cron.schedule('* * * * *', async () => {
 });
 
 app.listen(PORT, () => {
-  const environment = process.env.NODE_ENV || 'development';
-  const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-  
   console.log('\n🚀 DailyDiff Backend Server Started');
   console.log('=====================================');
   console.log(`📍 Environment: ${environment}`);
-  console.log(`🌐 Server URL: ${serverUrl}`);
-  console.log(`🔗 Frontend URL: ${clientUrl}`);
+  console.log(`🌐 Server URL: ${SERVER_URL}`);
+  console.log(`🔗 Frontend URL: ${CLIENT_URL}`);
   console.log(`⚡ Port: ${PORT}`);
   console.log(`🕐 Started at: ${new Date().toLocaleString()}`);
+  
+  // Show OAuth callback URL for easy setup
+  console.log('\n🔗 GitHub OAuth Configuration:');
+  console.log(`   Homepage URL: ${CLIENT_URL}`);
+  console.log(`   Callback URL: ${SERVER_URL}/auth/github/callback`);
   console.log('=====================================\n');
   
   // Validate required environment variables in production
