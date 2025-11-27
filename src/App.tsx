@@ -6,6 +6,8 @@ import { Flame, GitBranch, CheckCircle2 } from 'lucide-react';
 import API_URL from './config';
 
 function App() {
+  console.log("App component rendering...", { location: window.location.href });
+  
   const navigate = useNavigate();
   const location = useLocation();
   
