@@ -288,6 +288,34 @@ app.get('/api/content-strategies', (req, res) => {
   res.json({ strategies });
 });
 
+// --- NEW: Get User Repositories ---
+app.get('/api/repos', async (req, res) => {
+  if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    // Fetch repos sorted by recently updated
+    const response = await axios.get('https://api.github.com/user/repos', {
+      headers: {
+        Authorization: `Bearer ${req.session.token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+      params: {
+        sort: 'updated',
+        per_page: 100,      // Limit to top 100 active repos
+        affiliation: 'owner', // Only show repos owned by user to avoid clutter
+        visibility: 'all'
+      }
+    });
+
+    // Map to just the full names (e.g., "username/repo")
+    const repos = response.data.map(repo => repo.full_name);
+    res.json({ repos });
+  } catch (error) {
+    console.error("Failed to fetch repos:", error.message);
+    res.status(500).json({ error: "Failed to fetch repositories" });
+  }
+});
+
 // Manual Commit Route
 app.post('/api/commit-now', async (req, res) => {
   if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
