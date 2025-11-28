@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { User, LogOut, Settings, Github, ChevronDown, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { User, LogOut, Github, ChevronDown, ExternalLink } from 'lucide-react';
 
 interface User {
   id: string;
@@ -16,132 +16,118 @@ interface DashboardNavbarProps {
 
 const DashboardNavbar = ({ user, onSignOut }: DashboardNavbarProps) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleSignOut = () => {
     setIsProfileMenuOpen(false);
     onSignOut();
   };
 
+  // Enhanced click outside behavior
+  useEffect(() => {
+    const handleClickOutside = (event: Event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isProfileMenuOpen]);
+
   return (
-    <nav className="card-professional rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-8 sm:mb-10 relative overflow-hidden">
-      <div className="flex items-center justify-between">
+    <nav
+      className="bg-[#0d1117]/80 border-b border-[#21262d] z-50 backdrop-blur-md backdrop-saturate-150 backdrop-brightness-110 fixed top-0 w-full shadow-lg"
+      style={{
+        background: 'rgba(13,17,23,0.80)',
+        WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+        backdropFilter: 'blur(16px) saturate(180%)',
+        boxShadow: '0 4px 32px 0 rgba(0,0,0,0.25)'
+      }}
+    >
+      {/* FIX: Matched max-width to 7xl for alignment */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between relative">
         {/* Logo/Brand */}
-        <div className="flex items-center gap-4 interactive-element">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#39d353] to-[#2ea043] rounded-xl flex items-center justify-center shadow-lg shadow-[#39d353]/20">
-            <Github className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg overflow-hidden">
+            <img 
+              src="/diff.png" 
+              alt="DailyDiff Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <div>
-            <h1 className="heading-primary text-xl sm:text-2xl font-bold">DailyDiff</h1>
-            <p className="text-xs sm:text-sm text-muted-enhanced font-medium hidden sm:block">GitHub Contribution Automation</p>
+            <h1 className="text-[#f0f6fc] text-lg font-semibold">DailyDiff</h1>
+            <p className="text-xs text-[#7d8590] font-medium hidden sm:block">GitHub Contribution Automation</p>
           </div>
         </div>
 
         {/* User Profile Menu */}
         {user && (
-          <div className="relative">
+          <div className="relative" ref={dropdownRef}>
             <button
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              className="btn-secondary flex items-center gap-3 p-3 rounded-xl interactive-element"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsProfileMenuOpen(!isProfileMenuOpen);
+              }}
+              className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#21262d] border border-[#21262d] transition-all duration-200"
             >
               {/* Avatar */}
               {user.avatar_url ? (
                 <img
                   src={user.avatar_url}
                   alt={user.github_username}
-                  className="w-9 h-9 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#39d353]/30 shadow-lg"
+                  className="w-8 h-8 rounded-full ring-1 ring-[#30363d]"
                 />
               ) : (
-                <div className="w-9 h-9 sm:w-11 sm:h-11 bg-gradient-to-br from-gray-600 to-gray-700 rounded-full flex items-center justify-center shadow-lg">
-                  <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300" />
+                <div className="w-8 h-8 bg-[#30363d] rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-[#8b949e]" />
                 </div>
               )}
               
-              {/* User Info */}
-              <div className="text-left hidden sm:block">
-                <div className="text-sm font-semibold heading-secondary">
+              {/* User Info - Hidden on Mobile */}
+              <div className="text-left hidden md:block">
+                <div className="text-sm font-medium text-[#f0f6fc]">
                   {user.name || user.github_username}
-                </div>
-                <div className="text-xs text-muted-enhanced font-medium">
-                  @{user.github_username}
                 </div>
               </div>
 
               <ChevronDown 
-                className={`w-4 h-4 text-gray-400 transition-transform ${
+                className={`w-4 h-4 text-[#7d8590] transition-transform duration-200 ${
                   isProfileMenuOpen ? 'rotate-180' : ''
                 }`} 
               />
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Dropdown Menu - Positioned Relative to Button */}
             {isProfileMenuOpen && (
-              <>
-                {/* Backdrop */}
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setIsProfileMenuOpen(false)}
-                />
-                
-                {/* Menu */}
-                <div className="absolute right-0 top-full mt-2 w-64 animate-in z-50">
-                  <div className="dropdown-blur rounded-lg shadow-2xl overflow-hidden">
-                    {/* User Info Header */}
-                    <div className="p-4 border-b border-gray-700/30">
-                      <div className="flex items-center gap-3">
-                        {user.avatar_url ? (
-                          <img
-                            src={user.avatar_url}
-                            alt={user.github_username}
-                            className="w-12 h-12 rounded-full ring-2 ring-[#39d353]/20"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center">
-                            <User className="w-6 h-6 text-gray-300" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-white truncate">
-                            {user.name || user.github_username}
-                          </div>
-                          <div className="text-xs text-gray-400 truncate">
-                            @{user.github_username}
-                          </div>
-                          {user.email && (
-                            <div className="text-xs text-gray-500 truncate">
-                              {user.email}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Menu Items */}
+              <div className="absolute right-0 top-full mt-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="w-44 bg-[#161b22] rounded-lg shadow-2xl overflow-hidden border border-[#30363d]">
                     <div className="py-2">
                       <a
                         href={`https://github.com/${user.github_username}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-gray-700/30 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-[#f0f6fc] hover:bg-[#21262d] transition-colors duration-150"
                         onClick={() => setIsProfileMenuOpen(false)}
                       >
-                        <Github className="w-4 h-4 text-gray-400" />
+                        <Github className="w-4 h-4 text-[#7d8590]" />
                         <span>GitHub Profile</span>
-                        <ExternalLink className="w-3 h-3 text-gray-500 ml-auto" />
+                        <ExternalLink className="w-3 h-3 text-[#7d8590] ml-auto" />
                       </a>
 
-                      <button
-                        className="flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-gray-700/30 transition-colors w-full text-left"
-                        onClick={() => setIsProfileMenuOpen(false)}
-                      >
-                        <Settings className="w-4 h-4 text-gray-400" />
-                        <span>Settings</span>
-                      </button>
-
-                      <div className="border-t border-gray-700/30 my-2"></div>
+                      <div className="border-t border-[#21262d] my-1"></div>
 
                       <button
                         onClick={handleSignOut}
-                        className="flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors w-full text-left"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-[#f85149] hover:bg-[#21262d] hover:text-[#ff7b72] transition-colors duration-150 w-full text-left"
                       >
                         <LogOut className="w-4 h-4" />
                         <span>Sign Out</span>
@@ -149,43 +135,11 @@ const DashboardNavbar = ({ user, onSignOut }: DashboardNavbarProps) => {
                     </div>
                   </div>
                 </div>
-              </>
             )}
           </div>
         )}
       </div>
-
-      {/* Welcome Message */}
-      {user && (
-        <div className="mt-4 pt-4 border-t border-gray-800/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm sm:text-base font-medium text-white">
-                Welcome back, {user.name?.split(' ')[0] || user.github_username}! 👋
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                Ready to maintain your GitHub streak?
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-500">
-                {new Date().toLocaleDateString(undefined, { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </div>
-              <div className="text-xs text-gray-600 mt-1">
-                {new Date().toLocaleTimeString(undefined, { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* REMOVED: The duplicate "Welcome back" section was deleted from here */}
     </nav>
   );
 };

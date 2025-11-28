@@ -304,30 +304,30 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
           onSignOut={onLogout}
         />
 
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-6 sm:py-8 pt-18 sm:pt-20">
-          <div className="animate-fade-in-up">
+        {/* FIX: Changed max-w-6xl back to max-w-7xl for full width alignment */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pt-20 sm:pt-24">
+           
+           <div className="mb-8">
             <DashboardHeader userProfile={userProfile} />
           </div>
 
           {!isInitialized ? (
-            // Initial loading state to prevent component disappearing
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-              <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-                <div className="loading-shimmer h-64 rounded-xl"></div>
-                <div className="loading-shimmer h-96 rounded-xl"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="loading-shimmer h-64 rounded-xl border border-gray-800"></div>
+                <div className="loading-shimmer h-48 rounded-xl border border-gray-800"></div>
               </div>
-              <div className="space-y-6 sm:space-y-8">
-                <div className="loading-shimmer h-80 rounded-xl"></div>
-                <div className="loading-shimmer h-64 rounded-xl"></div>
-                <div className="loading-shimmer h-80 rounded-xl"></div>
+              <div className="space-y-6">
+                <div className="loading-shimmer h-48 rounded-xl border border-gray-800"></div>
+                <div className="loading-shimmer h-80 rounded-xl border border-gray-800"></div>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-            {/* Left Column - Main Content */}
-            <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-              <div className="animate-fade-in-up animate-delay-100">
+            // FIX: Reverted to standard 3-column grid for better fill
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Left Column - Main Content */}
+              <div className="lg:col-span-2 space-y-6">
                 <AutomationSettings 
                   isLoadingSettings={isLoadingSettings}
                   targetRepo={targetRepo} 
@@ -347,16 +347,16 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
                   fetchRepos={fetchRepos} 
                   isLoadingRepos={isLoadingRepos}
                 />
+                
+                <div className="card-professional rounded-xl p-6">
+                  <ContributionHistory />
+                </div>
+                
+                <MicroTaskGenerator targetRepo={targetRepo} />
               </div>
-              
-              <div className="card-professional rounded-xl sm:rounded-2xl p-6 sm:p-8 animate-fade-in-up animate-delay-200">
-                <ContributionHistory />
-              </div>
-            </div>
 
-            {/* Right Column - Sidebar */}
-            <div className="space-y-6 sm:space-y-8">
-              <div className="animate-fade-in-up animate-delay-100">
+              {/* Right Column - Sidebar */}
+              <div className="space-y-6">
                 <StreakCard 
                   streakData={{
                     current: streak,
@@ -373,16 +373,9 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
                   refreshStreak={refreshGitHubStreak}
                   username={userProfile?.username || 'Dev'}
                 />
-              </div>
-              
-              <div className="animate-fade-in-up animate-delay-200">
+                
                 <ManualCheckIn onManualCommit={handleManualCommit} />
               </div>
-              
-              <div className="animate-fade-in-up animate-delay-300">
-                <MicroTaskGenerator targetRepo={targetRepo} />
-              </div>
-            </div>
           </div>
           )}
         </main>

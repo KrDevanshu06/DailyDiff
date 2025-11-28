@@ -81,10 +81,9 @@ html, body {
     @apply bg-[#161b22]/80 backdrop-blur-xl border border-gray-800;
   }
 
+  /* FIX: Removed 'opacity: 0' from here to prevent permanent invisibility */
   .animate-fade-in-up {
     animation: fadeInUp 0.8s ease-out forwards;
-    opacity: 0;
-    transform: translateY(20px);
   }
   
   .delay-100 { animation-delay: 100ms; }
@@ -92,8 +91,13 @@ html, body {
   .delay-300 { animation-delay: 300ms; }
 }
 
+/* FIX: Defined opacity start/end states explicitly in keyframes */
 @keyframes fadeInUp {
-  to {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
     opacity: 1;
     transform: translateY(0);
   }
@@ -292,12 +296,11 @@ html, body {
 }
 
 .gentle-hover {
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .gentle-hover:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(255, 255, 255, 0.05) inset;
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 /* Professional Button Enhancements */
@@ -330,13 +333,11 @@ html, body {
 .btn-primary:hover {
   background: linear-gradient(135deg, #39d353 0%, #2ea043 100%);
   box-shadow: 
-    0 4px 16px rgba(46, 160, 67, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
+    0 2px 8px rgba(46, 160, 67, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .btn-primary:active {
-  transform: translateY(0);
   box-shadow: 
     0 1px 4px rgba(46, 160, 67, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -354,10 +355,6 @@ html, body {
 .btn-secondary:hover {
   background: linear-gradient(135deg, rgba(240, 246, 252, 0.15) 0%, rgba(240, 246, 252, 0.08) 100%);
   border-color: rgba(240, 246, 252, 0.3);
-  box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(240, 246, 252, 0.15);
-  transform: translateY(-1px);
 }
 
 /* Enhanced Form Inputs */
@@ -429,11 +426,6 @@ html, body {
 
 .card-professional:hover {
   border-color: rgba(240, 246, 252, 0.15);
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.35),
-    0 4px 16px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(240, 246, 252, 0.08);
-  transform: translateY(-2px);
 }
 
 /* Streak Card Enhancements */
@@ -453,11 +445,6 @@ html, body {
 
 .streak-card:hover {
   border-color: rgba(46, 160, 67, 0.3);
-  box-shadow: 
-    0 8px 32px rgba(46, 160, 67, 0.15),
-    0 4px 16px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(46, 160, 67, 0.15);
-  transform: translateY(-1px);
 }
 
 /* Enhanced Typography */
@@ -553,17 +540,13 @@ html, body {
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-/* Micro Interactions */
+/* Micro Interactions - Simplified */
 .interactive-element {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.2s ease;
 }
 
 .interactive-element:hover {
-  transform: translateY(-1px);
-}
-
-.interactive-element:active {
-  transform: translateY(0);
+  opacity: 0.9;
 }
 
 /* Page Transitions */
@@ -578,9 +561,7 @@ html, body {
   }
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* Removed duplicate animate-fade-in-up class */
 
 .animate-delay-100 {
   animation-delay: 0.1s;
