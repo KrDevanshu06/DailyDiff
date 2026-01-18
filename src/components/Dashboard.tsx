@@ -11,6 +11,7 @@ import ContributionHistory from './dashboard/ContributionHistory';
 import StreakCard from './dashboard/StreakCard';
 import ManualCheckIn from './dashboard/ManualCheckIn';
 import MicroTaskGenerator from './dashboard/MicroTaskGenerator';
+import DashboardFooter from './dashboard/DashboardFooter';
 
 // Types
 interface UserProfile {
@@ -39,8 +40,12 @@ interface DashboardProps {
 const Dashboard = ({ onLogout }: DashboardProps) => {
   // State management
   const [isInitialized, setIsInitialized] = useState(false);
-  const [streak, setStreak] = useState(0);
-  const [todayCommitted, setTodayCommitted] = useState(false);
+  const [streakStats, setStreakStats] = useState({
+    current: 0,
+    today: 0,
+    week: 0,
+    lastContribution: null as string | null
+  });
   const [isLoadingStreak, setIsLoadingStreak] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [targetRepo, setTargetRepo] = useState("");
@@ -79,6 +84,19 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // Check server connectivity
+  const checkServerConnection = async () => {
+    try {
+      const response = await fetch(`${API_URL}/health`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
   // --- DATA FETCHING ---
   const fetchRepos = async () => {
     setIsLoadingRepos(true);
@@ -98,7 +116,12 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
       if (response.ok) {
         const data = await response.json();
         if (data.authenticated) {
-          setStreak(data.streak || 0);
+          setStreakStats({
+            current: data.streak || 0,
+            today: data.todayCount || 0,
+            week: data.weekCount || 0,
+            lastContribution: data.lastContribution
+          });
           setUserProfile(prev => prev ? { ...prev, streak: data.streak } : null);
         }
       }
@@ -129,8 +152,12 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
               avatarUrl: userData.avatarUrl,
               streak: userData.streak
             });
-            setStreak(userData.streak || 0);
-            setTodayCommitted(userData.todayCommitted || false);
+            setStreakStats({
+              current: userData.streak || 0,
+              today: userData.todayCount || 0,
+              week: userData.weekCount || 0,
+              lastContribution: userData.lastContribution
+            });
             
             // Fetch repositories after confirming authentication
             console.log("📦 Fetching repositories...");
@@ -194,7 +221,7 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
 
   // Action handlers
   const handleManualCommit = async () => {
-    if (todayCommitted) {
+    if (streakStats.today > 0) {
       showToast("✅ Already committed today!", 'success');
       return;
     }
@@ -217,7 +244,6 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
       });
 
       if (response.ok) {
-        setTodayCommitted(true);
         showToast("✅ Commit pushed successfully!", 'success');
         await refreshGitHubStreak();
       } else {
@@ -237,7 +263,18 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
     }
 
     setIsSaving(true);
+    
+    // First check server connectivity
+    console.log('🔍 Checking server connectivity...');
+    const isServerUp = await checkServerConnection();
+    if (!isServerUp) {
+      showToast("❌ Cannot reach server. Please ensure the backend is running at " + API_URL, 'error');
+      setIsSaving(false);
+      return;
+    }
+    
     try {
+      console.log('🔄 Attempting to save settings to:', `${API_URL}/api/schedule`);
       const response = await fetch(`${API_URL}/api/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -255,11 +292,29 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
         showToast(`✅ Schedule saved for ${scheduleTime} (${userTimezone})`, 'success');
       } else {
         const errorData = await response.json();
+        console.error('❌ Server responded with error:', errorData);
         showToast(`❌ Error: ${errorData.error || 'Failed to save settings'}`, 'error');
       }
     } catch (error) {
       console.error('Save settings failed:', error);
-      showToast("❌ Network error. Please try again.", 'error');
+      console.error('API_URL:', API_URL);
+      
+      // Type guard for Error object
+      const err = error as Error;
+      console.error('Error details:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
+      
+      // More specific error messages
+      if (err.name === 'TypeError' && err.message.includes('fetch failed')) {
+        showToast("❌ Cannot connect to server. Please ensure the backend is running.", 'error');
+      } else if (err.name === 'TypeError' && err.message.includes('NetworkError')) {
+        showToast("❌ Network error. Check your internet connection.", 'error');
+      } else {
+        showToast(`❌ Connection error: ${err.message}`, 'error');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -359,15 +414,16 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
               <div className="space-y-6">
                 <StreakCard 
                   streakData={{
-                    current: streak,
-                    longest: streak,
-                    todayContributed: todayCommitted,
+                    current: streakStats.current,
+                    longest: streakStats.current, // Placeholder
+                    todayContributed: streakStats.today > 0,
                     contributions: {
-                      today: todayCommitted ? 1 : 0,
-                      yesterday: 0,
-                      thisWeek: 0,
+                      today: streakStats.today,
+                      yesterday: 0, // Can add if needed
+                      thisWeek: streakStats.week,
                       thisMonth: 0
-                    }
+                    },
+                    lastContribution: streakStats.lastContribution || undefined // Pass this string
                   }}
                   isLoadingStreak={isLoadingStreak} 
                   refreshStreak={refreshGitHubStreak}
@@ -379,6 +435,9 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
           </div>
           )}
         </main>
+
+        {/* --- ADD FOOTER HERE --- */}
+        <DashboardFooter />
       </div>
     </div>
   );
