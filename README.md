@@ -106,7 +106,7 @@
 
 | **Landing Page** | **Developer Dashboard** |
 |:---:|:---:|
-| <img width="1919" height="915" alt="image" src="https://github.com/user-attachments/assets/d120c6e6-eb4f-4486-af73-8e17a8d14176" /> | <img width="1327" height="911" alt="image" src="https://github.com/user-attachments/assets/0a3e8a19-57bf-4dfc-87fb-592b39f7d70f" /> |
+| <img width="1200" height="auto" alt="image" src="https://github.com/user-attachments/assets/a7b719bf-8184-4bdf-bb8a-094cf04449d9" /> | <img width="auto" height="auto" alt="image" src="https://github.com/user-attachments/assets/96c97a4f-d831-4c3a-ba61-17e705c3dc8d" /> |
 
 ---
 
