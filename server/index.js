@@ -11,14 +11,22 @@ import { getAvailableStrategies } from './contentStrategies.js';
 import { promises as fs } from 'fs';
 import path from 'path'; 
 
-dotenv.config();
+// Load environment config
+const environment = process.env.NODE_ENV || 'development';
+if (environment === 'development') {
+  dotenv.config({ path: '.env.local' });
+} else {
+  dotenv.config();
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
-// --- 1. CONFIGURATION ---
+// --- MIDDLEWARE ---
 const allowedOrigins = [
-  process.env.CLIENT_URL,
+  CLIENT_URL,
   process.env.CLIENT_URL_BRANCH, 
   'http://localhost:5173', 
   'http://127.0.0.1:5173'
@@ -32,36 +40,18 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+  credentials: true
 }));
 
 app.use(express.json());
-
-// --- HEALTH CHECK ROUTE ---
-app.get('/', (req, res) => {
-  res.status(200).send('✅ DailyDiff Backend is Active');
-});
-
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'active', 
-    timestamp: new Date(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
-    version: '1.0.0'
-  });
-});
-
 app.set('trust proxy', 1); 
 
 app.use(cookieSession({
   name: 'session',
-  keys: [process.env.SESSION_SECRET || 'daily_diff_secure_key_fallback'],
+  keys: [process.env.SESSION_SECRET || 'daily_diff_secure_key'],
   maxAge: 24 * 60 * 60 * 1000,
-  secure: process.env.NODE_ENV === 'production', 
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  secure: environment === 'production', 
+  sameSite: environment === 'production' ? 'none' : 'lax',
   httpOnly: true
 }));
 
@@ -71,141 +61,90 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// Log startup configuration
-const environment = process.env.NODE_ENV || 'development';
-console.log(`🔧 [CONFIG] Environment: ${environment}`);
-console.log(`🔧 [CONFIG] Server URL: ${process.env.SERVER_URL || `http://localhost:${PORT}`}`);
-console.log('---');
+// --- ROUTES ---
 
-// ================================================================
-// IN-MEMORY CACHES
-// ================================================================
-const streakCache = new Map();
+app.get('/', (req, res) => res.status(200).send('✅ DailyDiff Backend is Active'));
+app.get('/health', (req, res) => res.status(200).json({ status: 'active', timestamp: new Date() }));
 
-// --- 2. AUTH ROUTES ---
-
+// 1. Auth Routes
 app.get('/auth/github', (req, res) => {
-  const clientId = process.env.GITHUB_CLIENT_ID;
-  const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
-  const redirectUri = `${serverUrl}/auth/github/callback`;
-  const scope = 'repo user'; 
-  
-  console.log(`🔐 GitHub OAuth initiated - Redirect URI: ${redirectUri}`);
-  res.redirect(`https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&prompt=consent`);
+  const redirectUri = `${SERVER_URL}/auth/github/callback`;
+  res.redirect(`https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${redirectUri}&scope=repo user&prompt=consent`);
 });
 
 app.get('/auth/github/callback', async (req, res) => {
   const { code } = req.query;
-
-  if (!code) return res.status(400).send("No code provided by GitHub");
+  if (!code) return res.status(400).send("No code provided");
   
   try {
-    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
+    const tokenRes = await axios.post('https://github.com/login/oauth/access_token', {
       client_id: process.env.GITHUB_CLIENT_ID,
       client_secret: process.env.GITHUB_CLIENT_SECRET,
       code,
     }, { headers: { Accept: 'application/json' } });
 
-    const accessToken = tokenResponse.data.access_token;
-    if (!accessToken) throw new Error("Failed to get access token");
-
-    const userResponse = await axios.get('https://api.github.com/user', {
+    const accessToken = tokenRes.data.access_token;
+    const userRes = await axios.get('https://api.github.com/user', {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
     
-    const githubUser = userResponse.data;
+    const user = userRes.data;
 
-    const { error } = await supabase
-      .from('users')
-      .upsert({
-        github_id: githubUser.id.toString(),
-        username: githubUser.login,
-        email: githubUser.email,
-        avatar_url: githubUser.avatar_url, 
+    // Save/Update User in DB
+    await supabase.from('users').upsert({
+        github_id: user.id.toString(),
+        username: user.login,
+        email: user.email,
+        avatar_url: user.avatar_url, 
         access_token: accessToken
-      });
+    });
 
-    if (error) console.error("Supabase Error:", error);
-
-    req.session.githubId = githubUser.id.toString();
-    req.session.username = githubUser.login;
-    req.session.avatarUrl = githubUser.avatar_url;
+    req.session.githubId = user.id.toString();
+    req.session.username = user.login;
+    req.session.avatarUrl = user.avatar_url;
     req.session.token = accessToken; 
 
-    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/dashboard?login=success`);
-
+    res.redirect(`${CLIENT_URL}/dashboard?login=success`);
   } catch (error) {
-    console.error("❌ GitHub OAuth failed:", error.message);
-    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}?error=auth_failed&message=${encodeURIComponent(error.message)}`);
+    console.error("Auth failed:", error.message);
+    res.redirect(`${CLIENT_URL}?error=auth_failed`);
   }
 });
 
-// ================================================================
-// UPDATED /api/user ROUTE (Includes detailed stats)
-// ================================================================
+// 2. User Stats Route (CLEANED)
 app.get('/api/user', async (req, res) => {
-  if (req.session.githubId) {
-    
-    let streakData = { 
-      streak: 0,
-      todayCount: 0,
-      weekCount: 0,
-      lastContributionDate: null
-    };
-    
-    if (req.session.token) {
-      const cacheKey = req.session.githubId;
-      const cached = streakCache.get(cacheKey);
-      const ONE_HOUR = 60 * 60 * 1000;
+  if (!req.session.githubId) return res.json({ authenticated: false });
 
-      // 1. CHECK CACHE FIRST
-      if (cached && (Date.now() - cached.timestamp < ONE_HOUR)) {
-        console.log(`⚡ Serving streak from cache for ${req.session.username}`);
-        streakData = cached.data;
-      } else {
-        // 2. IF NO CACHE, FETCH FRESH DATA
-        try {
-          console.log(`🌍 Fetching fresh streak data for ${req.session.username}...`);
-          const freshData = await getRealtimeStreak(req.session.token);
-          
-          if (!freshData.error) {
-            streakData = freshData;
-            streakCache.set(cacheKey, { 
-              timestamp: Date.now(), 
-              data: streakData 
-            });
-          }
-        } catch (error) {
-          console.error("Error fetching streak:", error.message);
-          if (cached) streakData = cached.data;
-        }
-      }
+  let stats = { streak: 0, todayCount: 0, weekCount: 0, lastContributionDate: null };
+
+  if (req.session.token) {
+    // FIX: Redundant caching removed. We trust streakService to handle it.
+    try {
+      const data = await getRealtimeStreak(req.session.token);
+      if (!data.error) stats = data;
+    } catch (e) {
+      console.error("Streak fetch error:", e.message);
     }
-
-    res.json({ 
-      authenticated: true, 
-      username: req.session.username,
-      githubId: req.session.githubId,
-      avatarUrl: req.session.avatarUrl,
-      streak: streakData.streak,
-      // Pass these specific fields to frontend
-      todayCount: streakData.todayCount,
-      weekCount: streakData.weekCount,
-      lastContribution: streakData.lastContributionDate
-    });
-  } else {
-    res.json({ authenticated: false });
   }
+
+  res.json({ 
+    authenticated: true, 
+    username: req.session.username,
+    githubId: req.session.githubId,
+    avatarUrl: req.session.avatarUrl,
+    streak: stats.streak,
+    todayCount: stats.todayCount,
+    weekCount: stats.weekCount,
+    lastContribution: stats.lastContributionDate
+  });
 });
 
-// --- 3. FEATURE ROUTES ---
-// ... (Rest of the file remains exactly the same as before)
-// Copy everything below this line from your original file: 
-// /api/schedule, /api/commit-now, /api/contributions, cron job, etc.
+app.post('/api/logout', (req, res) => {
+  req.session = null;
+  res.json({ status: "logged out" });
+});
 
-// Get Schedule
+// 3. Settings & Content Routes
 app.get('/api/schedule', async (req, res) => {
   if (!req.session.githubId) return res.status(401).json({ error: "Unauthorized" });
   const { data, error } = await supabase.from('schedules').select('*').eq('user_github_id', req.session.githubId).single(); 
@@ -213,10 +152,10 @@ app.get('/api/schedule', async (req, res) => {
   res.json({ schedule: data });
 });
 
-// Save Schedule
 app.post('/api/schedule', async (req, res) => {
   if (!req.session.githubId) return res.status(401).json({ error: "Unauthorized" });
   const { repoName, scheduleTime, contentMode, timezone } = req.body;
+  
   const { error } = await supabase.from('schedules').upsert({
       user_github_id: req.session.githubId,
       target_repo: repoName,
@@ -225,17 +164,17 @@ app.post('/api/schedule', async (req, res) => {
       timezone: timezone || 'UTC',
       is_active: true
     }, { onConflict: 'user_github_id' });
+
   if (error) return res.status(500).json({ error: error.message });
+  
+  console.log(`✅ Schedule saved for ${req.session.username}`);
   res.json({ status: "success", message: "Schedule active" });
 });
 
-// Content Strategies
 app.get('/api/content-strategies', (req, res) => {
-  const strategies = getAvailableStrategies();
-  res.json({ strategies });
+  res.json({ strategies: getAvailableStrategies() });
 });
 
-// Get Repos
 app.get('/api/repos', async (req, res) => {
   if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
   try {
@@ -246,37 +185,35 @@ app.get('/api/repos', async (req, res) => {
     const repos = response.data.map(repo => repo.full_name);
     res.json({ repos });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch repositories" });
+    res.status(500).json({ error: "Failed to fetch repos" });
   }
 });
 
-// Commit Now
 app.post('/api/commit-now', async (req, res) => {
   if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
   const { repoName, message, contentStrategy } = req.body;
   
-  // Strategy Selection
-  let strategyToUse = contentStrategy;
-  if (!strategyToUse && req.session.githubId) {
-    try {
-      const { data } = await supabase.from('schedules').select('content_mode').eq('user_github_id', req.session.githubId).single();
-      strategyToUse = data?.content_mode;
-    } catch(e) {}
-  }
-
-  const result = await pushDailyUpdate(req.session.token, repoName.trim(), message, strategyToUse || 'learning-log', req.session.username);
+  const result = await pushDailyUpdate(
+    req.session.token, 
+    repoName, 
+    message, 
+    contentStrategy || 'learning-log', 
+    req.session.username
+  );
   
   if (result.success) {
     if (req.session.githubId) {
-       await supabase.from('schedules').update({ last_run_at: new Date().toISOString() }).eq('user_github_id', req.session.githubId);
+       await supabase.from('schedules')
+         .update({ last_run_at: new Date().toISOString() })
+         .eq('user_github_id', req.session.githubId);
     }
-    res.json({ status: 'success', content: result.content, strategy: result.strategy });
+    res.json({ status: 'success', content: result.content });
   } else {
     res.status(500).json({ status: 'error', message: result.error });
   }
 });
 
-// Contributions Route
+// 4. Contribution Graph (Disk Cached)
 const CACHE_FILE = path.join(process.cwd(), 'cache_contributions.json');
 const CACHE_DURATION = 60 * 60 * 1000; 
 
@@ -289,18 +226,10 @@ async function getDiskCache(key) {
   } catch (e) { return null; }
 }
 
-async function setDiskCache(key, data) {
-  try {
-    let cache = {};
-    try { cache = JSON.parse(await fs.readFile(CACHE_FILE, 'utf-8')); } catch (e) {}
-    cache[key] = { timestamp: Date.now(), data };
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
-  } catch (e) { console.error("Cache write failed:", e); }
-}
-
 app.get('/api/contributions', async (req, res) => {
   if (!req.session.token) return res.status(401).json({ error: "Unauthorized" });
   const cacheKey = `contributions_${req.session.githubId}`;
+  
   const cachedData = await getDiskCache(cacheKey);
   if (cachedData) return res.json({ contributions: cachedData });
   
@@ -312,39 +241,48 @@ app.get('/api/contributions', async (req, res) => {
     
     const weeks = response.data.data.user.contributionsCollection.contributionCalendar.weeks;
     const allDays = weeks.flatMap(week => week.contributionDays);
-    await setDiskCache(cacheKey, allDays.map(day => ({ date: day.date, count: day.contributionCount })));
-    res.json({ contributions: allDays.map(day => ({ date: day.date, count: day.contributionCount })) });
+    
+    // Save to disk
+    let cache = {};
+    try { cache = JSON.parse(await fs.readFile(CACHE_FILE, 'utf-8')); } catch (e) {}
+    cache[cacheKey] = { timestamp: Date.now(), data: allDays.map(d => ({ date: d.date, count: d.contributionCount })) };
+    await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
+
+    res.json({ contributions: cache[cacheKey].data });
   } catch (error) {
     res.json({ contributions: [], error: error.message });
   }
 });
 
-app.post('/api/logout', (req, res) => { req.session = null; res.json({ status: "logged out" }); });
-
-// Cron Job
+// --- CRON JOB ---
 cron.schedule('* * * * *', async () => {
-  const now = new Date();
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  console.log(`⏰ [CRON] Tick: ${now.toISOString()}`);
-
+  console.log(`⏰ Tick: ${new Date().toISOString()}`);
   try {
     const { data: schedules } = await supabase.from('schedules').select('*, users(access_token, username)').eq('is_active', true);
-    if (schedules) {
-      for (const job of schedules) {
-        const userTime = new Date().toLocaleTimeString('en-US', { timeZone: job.timezone || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false });
-        const [uH, uM] = userTime.split(':');
-        const [sH, sM] = job.schedule_time.split(':');
-        
-        if (uH == sH && uM == sM && job.users?.access_token) {
-             console.log(`   🚀 Triggering job for ${job.users.username}`);
-             const res = await pushDailyUpdate(job.users.access_token, job.target_repo, "", job.content_mode || 'learning-log', job.users.username);
-             if(res.success) await supabase.from('schedules').update({ last_run_at: new Date().toISOString() }).eq('id', job.id);
-        }
+    if (!schedules) return;
+
+    for (const job of schedules) {
+      // Timezone Aware Check
+      const userTime = new Date().toLocaleTimeString('en-US', { 
+        timeZone: job.timezone || 'UTC', 
+        hour: '2-digit', minute: '2-digit', hour12: false 
+      });
+      
+      const [uH, uM] = userTime.split(':');
+      const [sH, sM] = job.schedule_time.split(':');
+
+      if (uH == sH && uM == sM && job.users?.access_token) {
+           console.log(`🚀 Executing job for ${job.users.username}`);
+           const res = await pushDailyUpdate(job.users.access_token, job.target_repo, "", job.content_mode, job.users.username);
+           
+           // Update timestamp regardless of success to prevent infinite retries
+           await supabase.from('schedules').update({ last_run_at: new Date().toISOString() }).eq('id', job.id);
       }
     }
-  } catch (e) { console.error("Cron failed", e); }
+  } catch (e) { console.error("Cron failed", e.message); }
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`\n🚀 DailyDiff Backend Running on ${SERVER_URL}`);
+  console.log(`🔗 Frontend expected at ${CLIENT_URL}\n`);
 });

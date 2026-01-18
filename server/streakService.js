@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-// Simple cache for streak data
+// Centralized Cache
 const streakCache = new Map();
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
@@ -8,14 +8,15 @@ export async function getRealtimeStreak(accessToken) {
   const cacheKey = `streak_${accessToken.slice(-8)}`;
   const cached = streakCache.get(cacheKey);
   
+  // 1. Return cached data if fresh
   if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log('Returning cached streak data');
+    console.log('⚡ Returning cached streak data from Service');
     return cached.data;
   }
 
   const octokit = new Octokit({ 
     auth: accessToken,
-    request: { timeout: 15000, retries: 1 }
+    request: { timeout: 15000 }
   });
 
   try {
@@ -36,60 +37,47 @@ export async function getRealtimeStreak(accessToken) {
       }
     `;
 
-    const response = await Promise.race([
-      octokit.graphql(query),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 20000))
-    ]);
-
+    const response = await octokit.graphql(query);
     const weeks = response.viewer.contributionsCollection.contributionCalendar.weeks;
     const days = weeks.flatMap((week) => week.contributionDays).reverse();
     
     const today = new Date().toISOString().split('T')[0];
     
-    // 1. Calculate Streak
+    // 2. Calculate Stats
     let streak = 0;
     for (const day of days) {
       if (day.date > today) continue;
-      if (day.contributionCount > 0) {
-        streak++;
-      } else {
-        if (day.date === today) continue;
-        break;
-      }
+      if (day.contributionCount > 0) streak++;
+      else if (day.date !== today) break;
     }
 
-    // 2. Calculate Today's Count
     const todayData = days.find(d => d.date === today);
     const todayCount = todayData ? todayData.contributionCount : 0;
 
-    // 3. Calculate This Week's Count
-    // Get start of the current week (Sunday)
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 (Sun) to 6 (Sat)
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
     const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
 
     const weekCount = days
       .filter(d => d.date >= startOfWeekStr && d.date <= today)
       .reduce((acc, d) => acc + d.contributionCount, 0);
 
-    // 4. Find Last Contribution Date
     const lastContrib = days.find(d => d.contributionCount > 0);
-    const lastContributionDate = lastContrib ? lastContrib.date : null;
 
     const result = { 
         streak, 
         todayCount, 
         weekCount, 
-        lastContributionDate 
+        lastContributionDate: lastContrib ? lastContrib.date : null 
     };
 
+    // 3. Save to Cache
     streakCache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
 
   } catch (error) {
-    console.error("Failed to calc streak:", error);
-    return { streak: 0, todayCount: 0, weekCount: 0, error: true };
+    console.error("Streak calculation failed:", error.message);
+    return { streak: 0, todayCount: 0, weekCount: 0, lastContributionDate: null, error: true };
   }
 }

@@ -16,7 +16,13 @@ import {
   ArrowRight,
   ChevronDown,
   Menu,
-  X
+  X,
+  Twitter,
+  Linkedin,
+  Mail,
+  Heart,
+  FileText,
+  Bug
 } from 'lucide-react';
 import API_URL from '../config';
 
@@ -818,163 +824,146 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#0d1117] border-t border-gray-800 pt-12 sm:pt-16 pb-6 sm:pb-8 relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          {/* Main Footer Content */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-8 sm:mb-12">
-            {/* Brand Column - Takes 2 columns on larger screens */}
-            <div className="sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-2 mb-4 sm:mb-6">
-                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-[#2ea043] to-[#238636] rounded-lg">
-                  <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-white fill-white" />
-                </div>
-                <span className="font-bold text-lg sm:text-xl tracking-tight text-white">Daily<span className="text-[#39d353]">Diff</span></span>
+      <footer className="mt-auto border-t border-gray-800/40 bg-[#0d1117]/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+            
+            {/* Column 1: Brand & Status */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-gray-100">
+                <span className="font-bold text-lg tracking-tight">Daily<span className="text-[#39d353]">Diff</span></span>
+                <span className="px-2 py-0.5 rounded-full bg-[#39d353]/10 text-[#39d353] text-[10px] font-bold border border-[#39d353]/20">BETA</span>
               </div>
-              <p className="text-gray-500 max-w-sm mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
-                Helping developers build lasting habits, one commit at a time. 
-                Ethical streak tracking for the modern developer.
+              <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+                The intelligent coding companion for developers who want to build consistent habits without the burnout.
               </p>
-              <div className="flex items-center gap-4">
-                <a href="https://github.com/KrDevanshu06" target="_blank" rel="noopener noreferrer" 
-                   className="text-gray-600 hover:text-white transition-colors duration-300 hover:scale-110 transform"
-                   aria-label="Visit our GitHub">
-                  <Github className="w-4 h-4 sm:w-5 sm:h-5" />
-                </a>
-                <a href="https://twitter.com/KrDevanshu06" className="text-gray-600 hover:text-white transition-colors duration-300 hover:scale-110 transform"
-                   aria-label="Follow us on Twitter">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
-                </a>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/30 border border-gray-700/30 w-fit">
+                <div className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#39d353] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#39d353]"></span>
+                </div>
+                <span className="text-xs font-medium text-gray-400">Systems Operational</span>
               </div>
             </div>
 
-            {/* Product Column */}
-            <div className="flex flex-col">
-              <h4 className="font-bold text-white mb-6 text-sm uppercase tracking-wider">Product</h4>
-              <ul className="space-y-4 text-sm">
+            {/* Column 2: Product & Support */}
+            <div>
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Product</h3>
+              <ul className="space-y-3">
                 <li>
-                  <button 
-                    onClick={() => scrollToSection('features')}
-                    className="text-gray-500 hover:text-[#39d353] transition-colors duration-300 cursor-pointer text-left"
+                  <a 
+                    href="https://github.com/krdevanshu06/dailydiff/releases"
+                    target="_blank"
+                    rel="noreferrer" 
+                    className="text-sm text-gray-500 hover:text-[#39d353] transition-colors flex items-center gap-2 group"
                   >
-                    Features
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => scrollToSection('how-it-works')}
-                    className="text-gray-500 hover:text-[#39d353] transition-colors duration-300 cursor-pointer text-left"
-                  >
-                    How it Works
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => scrollToSection('demo')}
-                    className="text-gray-500 hover:text-[#39d353] transition-colors duration-300 cursor-pointer text-left"
-                  >
-                    Live Demo
-                  </button>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    Integrations
+                    <span className="text-gray-600 group-hover:text-[#39d353] transition-colors"><FileText size={14} /></span>
+                    Changelog
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    API Docs
+                  <a 
+                    href="https://github.com/krdevanshu06/dailydiff/issues"
+                    target="_blank"
+                    rel="noreferrer" 
+                    className="text-sm text-gray-500 hover:text-[#39d353] transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="text-gray-600 group-hover:text-[#39d353] transition-colors"><Zap size={14} /></span>
+                    Feature Requests
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="https://github.com/krdevanshu06/dailydiff/issues/new"
+                    target="_blank"
+                    rel="noreferrer" 
+                    className="text-sm text-gray-500 hover:text-[#39d353] transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="text-gray-600 group-hover:text-[#39d353] transition-colors"><Bug size={14} /></span>
+                    Report a Bug
                   </a>
                 </li>
               </ul>
             </div>
 
-            {/* Company Column */}
-            <div className="flex flex-col">
-              <h4 className="font-bold text-white mb-6 text-sm uppercase tracking-wider">Company</h4>
-              <ul className="space-y-4 text-sm">
+            {/* Column 3: Legal */}
+            <div>
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Legal</h3>
+              <ul className="space-y-3">
                 <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    About
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    Blog
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    Careers
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    Contact
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    Press Kit
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Legal Column */}
-            <div className="flex flex-col">
-              <h4 className="font-bold text-white mb-6 text-sm uppercase tracking-wider">Legal</h4>
-              <ul className="space-y-4 text-sm">
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
+                  <a 
+                    href="#"
+                    className="text-sm text-gray-500 hover:text-white transition-colors flex items-center gap-2"
+                  >
                     Privacy Policy
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
+                  <a 
+                    href="#"
+                    className="text-sm text-gray-500 hover:text-white transition-colors flex items-center gap-2"
+                  >
                     Terms of Service
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    Security
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    Cookie Policy
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="text-gray-500 hover:text-[#39d353] transition-colors duration-300">
-                    GDPR
                   </a>
                 </li>
               </ul>
             </div>
+
+            {/* Column 4: Connect */}
+            <div>
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Connect</h3>
+              <div className="flex gap-4">
+                <a
+                  href="https://github.com/KrDevanshu06"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-lg bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200 border border-gray-700/50 hover:border-gray-600 hover:-translate-y-1"
+                  aria-label="GitHub"
+                >
+                  <Github size={18} />
+                </a>
+                <a
+                  href="https://twitter.com/KrDevanshu06"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-lg bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200 border border-gray-700/50 hover:border-gray-600 hover:-translate-y-1"
+                  aria-label="Twitter"
+                >
+                  <Twitter size={18} />
+                </a>
+                <a
+                  href="https://linkedin.com/in/krdevanshu06"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-lg bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200 border border-gray-700/50 hover:border-gray-600 hover:-translate-y-1"
+                  aria-label="LinkedIn"
+                >
+                  <Linkedin size={18} />
+                </a>
+                <a
+                  href="mailto:KrDevanshu06@gmail.com"
+                  className="p-2 rounded-lg bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200 border border-gray-700/50 hover:border-gray-600 hover:-translate-y-1"
+                  aria-label="Email"
+                >
+                  <Mail size={18} />
+                </a>
+              </div>
+              <p className="mt-6 text-xs text-gray-600">
+                Questions? <a href="mailto:KrDevanshu06@gmail.com" className="text-gray-400 hover:text-[#39d353] transition-colors">Contact Support</a>
+              </p>
+            </div>
           </div>
 
-          {/* Footer Bottom */}
-          <div className="border-t border-gray-800 pt-6 sm:pt-8">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6">
-              <p className="text-gray-600 text-xs sm:text-sm order-2 lg:order-1">
-                © 2025 DailyDiff. All rights reserved. Made with <span className="text-red-500">❤️</span> for developers.
-              </p>
-              <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500 order-1 lg:order-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#39d353]"></div>
-                  <span>Privacy-first</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                  <span>No fake commits</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  <span>Free forever</span>
-                </div>
-              </div>
+          {/* Bottom Bar */}
+          <div className="mt-12 pt-8 border-t border-gray-800/50 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-gray-500 flex items-center gap-1.5">
+              Made with <Heart size={12} className="text-red-500 fill-red-500/20 animate-pulse" /> by 
+              <a href="https://github.com/KrDevanshu06" target="_blank" rel="noreferrer" className="text-gray-300 hover:text-[#39d353] transition-colors font-medium">
+                KrDevanshu06
+              </a>
+            </p>
+            <div className="text-xs text-gray-600">
+              © 2026 DailyDiff. Open Source under MIT License.
             </div>
           </div>
         </div>

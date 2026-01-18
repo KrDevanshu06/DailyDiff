@@ -4,7 +4,7 @@ import {
   Linkedin, 
   Mail, 
   Heart, 
-  ExternalLink, 
+  // ExternalLink, 
   FileText, 
   Bug, 
   Zap, 
@@ -25,9 +25,9 @@ const DashboardFooter = () => {
       { label: 'Terms of Service', href: '#', icon: <FileText size={14} /> },
     ],
     social: [
-      { label: 'GitHub', href: 'https://github.com/KrDevanshu06', icon: <Github size={18} /> },
+      { label: 'GitHub', href: 'https://github.com/daily-diff', icon: <Github size={18} /> },
       { label: 'Twitter', href: 'https://twitter.com/KrDevanshu06', icon: <Twitter size={18} /> },
-      { label: 'LinkedIn', href: 'https://linkedin.com/in/krdevanshu06', icon: <Linkedin size={18} /> },
+      { label: 'LinkedIn', href: 'https://linkedin.com/company/dailydiff', icon: <Linkedin size={18} /> },
       { label: 'Email', href: 'mailto:KrDevanshu06@gmail.com', icon: <Mail size={18} /> },
     ]
   };
